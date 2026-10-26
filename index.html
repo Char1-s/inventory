@@ -7,7 +7,9 @@
 <div class="progress" id="progress"><span class="on"></span><span></span><span></span><span></span><span></span></div>
 <section class="card"><div class="step" id="step">1 / 5 단계</div><h1 id="title">로케이션 스캔</h1><p class="hint" id="hint">카메라를 켜고 바코드를 중앙에 맞춘 뒤 촬영/인식 버튼을 누르세요.</p><input id="entry" autocomplete="off" aria-label="입력값">
 <div id="camArea" class="hidden"><div class="camera"><video id="video" autoplay playsinline muted></video><div class="frame"></div></div><div class="actions"><button class="btn secondary" id="capture">촬영 / 인식</button><button class="btn secondary" id="refreshCam">카메라 새로고침</button></div><p class="note">초록색 테두리 안에 바코드를 맞추고 흔들림 없이 촬영하세요. 여러 개가 인식되면 목록에서 선택합니다.</p><div class="choices" id="choices"></div></div>
-<button class="btn primary full" id="cameraBtn">카메라 켜기</button><button class="btn primary full hidden" id="next">다음</button><div id="msg"></div><p class="note" id="camNote">HTTPS 주소에서 카메라 권한을 허용해야 합니다.</p></section>
+<button class="btn primary full" id="cameraBtn">카메라 켜기</button>
+<button class="btn primary full hidden" id="next">다음</button>
+<div id="msg"></div><p class="note" id="camNote">HTTPS 주소에서 카메라 권한을 허용해야 합니다.</p></section>
 <section class="records"><b>최근 저장 내역</b><div id="recent"></div></section><p class="note" id="status">데이터는 이 브라우저에 저장됩니다.</p></main>
 <div class="bottom"><button class="btn secondary" id="reset">처음 단계로</button><button class="btn primary" id="download">CSV 다운로드</button></div>
 <script>
@@ -17,23 +19,52 @@ const steps=[
 {key:"barcode",title:"상품코드 스캔",hint:"상품 바코드를 촬영/인식하세요.",scan:true,ph:"상품코드"},
 {key:"packQty",title:"입수 입력",hint:"박스 1개에 들어 있는 수량을 입력하세요.",ph:"입수",num:true},
 {key:"boxQty",title:"박스수 입력",hint:"박스 수량을 입력하세요.",ph:"박스수",num:true},
-{key:"each",title:"낱개수 입력",hint:"낱개 수량을 입력하세요. Enter로 저장할 수 있습니다.",ph:"낱개수",num:true}];
+{key:"each",title:"낱개수 입력",hint:"낱개 수량을 입력하세요. Enter 또는 저장 버튼을 누르면 저장됩니다.",ph:"낱개수",num:true}];
 let records=[];try{records=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){}if(!Array.isArray(records))records=[];
 let i=0,stream=null,facing="environment",current={location:"",barcode:"",packQty:"",boxQty:"",each:""},detector=null,busy=false;
-try{if("BarcodeDetector"in window)detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","codabar","qr_code"]})}catch(e){}
+
+// Code128, EAN13 중심 전체 지원 포맷 명시
+try{if("BarcodeDetector"in window)detector=new BarcodeDetector({formats:["code_128","ean_13","code_39","code_93","codabar","ean_8","itf","qr_code","upc_a","upc_e"]})}catch(e){}
+
 function update(){ $("count").textContent="저장 "+records.length+"건";const r=$("recent");r.replaceChildren();if(!records.length){r.textContent="아직 저장된 데이터가 없습니다.";return}records.slice(-3).reverse().forEach(x=>{let d=document.createElement("div");d.className="recordline";d.textContent=`${x.location} · ${x.barcode} · 입수 ${x.packQty} · 박스수 ${x.boxQty} · 낱개수 ${x.each}`;r.appendChild(d)})}
 function msg(t){$("msg").textContent=t;$("msg").style.display="block"}function clearMsg(){$("msg").style.display="none"}
 async function stop(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;$("camArea").classList.add("hidden");$("cameraBtn").classList.remove("hidden");$("cameraBtn").textContent="카메라 켜기";busy=false}
-async function show(n){await stop();i=n;let s=steps[i];$("step").textContent=`${i+1} / ${steps.length} 단계`;$("title").textContent=s.title;$("hint").textContent=s.hint;$("progress").querySelectorAll("span").forEach((x,j)=>x.classList.toggle("on",j<=i));entry.value=current[s.key]||"";entry.placeholder=s.ph;entry.type=s.num?"number":"text";entry.inputMode=s.num?"numeric":"text";$("cameraBtn").classList.toggle("hidden",!s.scan);$("next").classList.toggle("hidden",s.scan);$("camNote").classList.toggle("hidden",!s.scan);$("choices").replaceChildren();clearMsg();if(!s.scan)setTimeout(()=>entry.focus(),100);else if(i===0&&current.location)msg("이전 로케이션이 자동 입력되어 있습니다. 다른 위치면 수정하거나 다시 스캔하세요.")}
+
+async function show(n){
+  await stop();
+  i=n;
+  let s=steps[i];
+  $("step").textContent=`${i+1} / ${steps.length} 단계`;
+  $("title").textContent=s.title;
+  $("hint").textContent=s.hint;
+  $("progress").querySelectorAll("span").forEach((x,j)=>x.classList.toggle("on",j<=i));
+  entry.value=current[s.key]||"";
+  entry.placeholder=s.ph;
+  entry.type=s.num?"number":"text";
+  entry.inputMode=s.num?"numeric":"text";
+  
+  $("cameraBtn").classList.toggle("hidden",!s.scan);
+  // 스캔 단계가 아닌 경우(입력 단계) 항상 '다음' 또는 '저장' 버튼 노출
+  $("next").classList.toggle("hidden",s.scan);
+  $("next").textContent = (i === steps.length - 1) ? "저장하기" : "다음";
+  $("camNote").classList.toggle("hidden",!s.scan);
+  
+  $("choices").replaceChildren();
+  clearMsg();
+  if(!s.scan)setTimeout(()=>entry.focus(),100);
+  else if(i===0&&current.location)msg("이전 로케이션이 자동 입력되어 있습니다. 다른 위치면 수정하거나 다시 스캔하세요.");
+}
+
 async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;await video.play();$("camArea").classList.remove("hidden");$("cameraBtn").classList.add("hidden");clearMsg()}catch(e){await stop();alert("카메라를 시작하지 못했습니다. HTTPS 주소와 카메라 권한을 확인하세요. "+(e.message||""))}}
 async function refreshCam(){await stop();await start()}
+
 function choose(val){
   current[steps[i].key]=val;
   entry.value=val;
   $("choices").replaceChildren();
-  // 확인 후 바로 다음 단계로 자동 진행
   next();
 }
+
 function displayCandidates(arr){
   let uniq=[...new Map(arr.filter(x=>x.rawValue).map(x=>[x.rawValue,x])).values()];
   if(!uniq.length){msg("인식하지 못했습니다. 조명을 밝게 하고 바코드를 더 가까이 맞춰 다시 촬영하세요.");return}
@@ -50,7 +81,6 @@ function displayCandidates(arr){
     return;
   }
   
-  // 복수 개 인식될 경우 리스트에서 선택
   const c=$("choices");
   c.replaceChildren();
   let intro=document.createElement("p");
@@ -60,19 +90,3 @@ function displayCandidates(arr){
     let b=document.createElement("button");
     b.className="choice";
     b.type="button";
-    b.textContent=x.rawValue;
-    let small=document.createElement("small");
-    small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;
-    b.appendChild(small);
-    b.onclick=()=>choose(x.rawValue);
-    c.appendChild(b);
-  });
-}
-async function capture(){if(!stream){await start();if(!stream)return}if(busy)return;busy=true;$("capture").textContent="인식 중…";try{if(detector){displayCandidates(await detector.detect(video))}else{if(typeof Html5Qrcode==="undefined")throw Error("인식 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.");let canvas=document.createElement("canvas");canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);let blob=await new Promise(res=>canvas.toBlob(res,"image/png"));let file=new File([blob],"capture.png",{type:"image/png"});let el=document.createElement("div");el.id="stillScan"+Date.now();el.style.display="none";document.body.appendChild(el);let qr=new Html5Qrcode(el.id);try{let result=await qr.scanFile(file,true);displayCandidates([{rawValue:result,format:"barcode"}])}catch(e){msg("인식하지 못했습니다. 조명을 밝게 하고 다시 촬영하세요.")}finally{try{await qr.clear()}catch(e){}el.remove()}}}catch(e){msg("바코드 인식에 실패했습니다. 초점과 조명을 확인하고 다시 촬영하세요.")}finally{busy=false;$("capture").textContent="촬영 / 인식"}}
-function next(){let s=steps[i],v=entry.value.trim();if(!v){alert(s.title+" 값을 입력하거나 스캔하세요.");entry.focus();return}current[s.key]=v;if(i<steps.length-1)show(i+1);else save()}
-function save(){records.push({...current});localStorage.setItem(KEY,JSON.stringify(records));let loc=current.location;current={location:loc,barcode:"",packQty:"",boxQty:"",each:""};update();$("status").textContent="저장 완료. 같은 로케이션이면 그대로 두고 상품코드만 스캔하세요.";show(0)}
-function csv(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
-function download(){if(!records.length){alert("다운로드할 데이터가 없습니다.");return}if(!confirm("CSV 다운로드 후 조사 데이터를 초기화할까요?"))return;let rows=[["로케이션","상품코드","입수","박스수","낱개수"],...records.map(r=>[r.location,r.barcode,r.packQty,r.boxQty,r.each])];let blob=new Blob(["\uFEFF"+rows.map(r=>r.map(csv).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),a=document.createElement("a"),d=new Date(),p=n=>String(n).padStart(2,"0");a.href=url;a.download=`재고조사_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>{URL.revokeObjectURL(url);records=[];localStorage.removeItem(KEY);current={location:"",barcode:"",packQty:"",boxQty:"",each:""};update();$("status").textContent="CSV 다운로드 후 데이터가 초기화되었습니다.";show(0)},800)}
-$("cameraBtn").onclick=start;$("capture").onclick=capture;$("refreshCam").onclick=refreshCam;$("next").onclick=next;entry.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();next()}});$("reset").onclick=()=>{if(confirm("입력 중인 항목을 초기화할까요? 저장된 데이터는 유지됩니다.")){current={location:current.location,barcode:"",packQty:"",boxQty:"",each:""};show(0)}};$("download").onclick=download;window.addEventListener("beforeunload",()=>stream&&stream.getTracks().forEach(t=>t.stop()));update();show(0)
-})();
-</script></body></html>
