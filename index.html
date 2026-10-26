@@ -1,147 +1,39 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>카메라 재고조사</title>
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>카메라 재고조사</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-:root{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#172033;background:#f3f5f8}
-*{box-sizing:border-box} body{margin:0;min-height:100vh}
-header{background:#16324f;color:white;padding:16px 18px;font-size:20px;font-weight:800}
-#count{float:right;font-size:14px;background:#ffffff24;padding:5px 9px;border-radius:20px}
-main{max-width:520px;margin:auto;padding:18px 16px 110px}
-.progress{display:flex;gap:5px;margin:4px 0 20px}.progress span{height:5px;background:#d4dbe5;border-radius:8px;flex:1}.progress span.on{background:#2474e5}
-.card,.records{background:white;border-radius:18px;padding:24px 18px;box-shadow:0 4px 18px #1020400d}
-.step{font-size:13px;color:#2474e5;font-weight:800;margin-bottom:8px}h1{font-size:28px;margin:0 0 8px}
-.hint{color:#657187;font-size:14px;line-height:1.5;margin:0 0 22px}
-input{width:100%;height:62px;border:2px solid #d9e0ea;border-radius:12px;padding:12px;font-size:24px;text-align:center;background:white;color:#172033}
-input:focus{outline:3px solid #bfdbfe;border-color:#2474e5}
-.btn{border:0;border-radius:12px;min-height:54px;padding:12px 16px;font-size:17px;font-weight:750;cursor:pointer}
-.primary{background:#1769e0;color:white;width:100%;margin-top:16px}.secondary{background:#e9eef5;color:#23344d;width:100%;margin-top:10px}
-.hidden{display:none!important}#reader{width:100%;margin-top:16px;overflow:hidden;border-radius:12px}
-.cameraNote{font-size:12px;color:#657187;line-height:1.5;margin-top:12px}
-.bottom{position:fixed;bottom:0;left:0;right:0;background:#ffffffed;border-top:1px solid #e1e6ee;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;justify-content:center}
-.bottom button{max-width:520px;flex:1}.status{font-size:14px;color:#526078;margin-top:14px;text-align:center}
-.records{margin-top:18px;padding:14px}.records h2{font-size:16px;margin:0 0 8px}
-.recordline{font-size:13px;color:#59667a;padding:8px 0;border-bottom:1px solid #edf0f4;overflow-wrap:anywhere}
-#toast{font-size:14px;color:#12603b;background:#e7f8ee;border-radius:10px;padding:10px;margin-top:12px;display:none}
-</style>
-</head>
-<body>
-<header>카메라 재고조사 <span id="count">저장 0건</span></header>
-<main>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#172033;font-family:system-ui,sans-serif}header{background:#16324f;color:white;padding:16px;font-size:20px;font-weight:bold}#count{float:right;font-size:14px}main{max-width:560px;margin:auto;padding:16px 14px 100px}.card,.records{background:white;border-radius:16px;padding:20px;margin-bottom:14px}.step{color:#1769e0;font-size:13px;font-weight:bold}h1{font-size:27px;margin:8px 0}.hint,.note{color:#657187;font-size:14px;line-height:1.5}input{width:100%;height:60px;border:2px solid #d9e0ea;border-radius:12px;font-size:23px;text-align:center;padding:10px}.btn{border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:bold;min-height:50px;cursor:pointer}.primary{background:#1769e0;color:white}.secondary{background:#e9eef5;color:#23344d}.full{width:100%;margin-top:12px}.hidden{display:none!important}.progress{display:flex;gap:5px;margin-bottom:16px}.progress span{height:5px;flex:1;background:#d4dbe5;border-radius:8px}.progress .on{background:#2474e5}.camera{position:relative;margin-top:14px;background:#111;border-radius:12px;overflow:hidden}.camera video{display:block;width:100%;max-height:48vh;object-fit:cover}.frame{position:absolute;top:34%;left:7%;right:7%;height:32%;border:2px solid #31e58b;border-radius:10px;pointer-events:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.actions button{width:100%}.choices{display:grid;gap:8px;margin-top:10px}.choice{border:1px solid #d9e2ef;border-radius:10px;padding:12px;text-align:left;font-size:17px;background:#f5f8fc;overflow-wrap:anywhere}.choice small{display:block;color:#657187}.bottom{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;background:#ffffffed;padding:10px}.bottom button{flex:1}.recordline{padding:8px 0;border-bottom:1px solid #eee;font-size:13px;overflow-wrap:anywhere}#msg{display:none;background:#e7f8ee;color:#12603b;padding:10px;border-radius:10px;margin-top:10px;font-size:14px}
+</style></head><body><header>카메라 재고조사 <span id="count">저장 0건</span></header><main>
 <div class="progress" id="progress"><span class="on"></span><span></span><span></span><span></span><span></span></div>
-<section class="card">
-  <div class="step" id="stepLabel">1 / 5 단계</div>
-  <h1 id="title">로케이션 스캔</h1>
-  <p class="hint" id="hint">카메라로 로케이션 바코드를 비춰 주세요.</p>
-  <input id="entry" autocomplete="off" autocapitalize="off" aria-label="입력값">
-  <button class="btn primary" id="scanBtn" type="button">카메라로 스캔</button>
-  <div id="reader" class="hidden"></div>
-  <div class="cameraNote" id="cameraNote">카메라 사용은 HTTPS 주소에서 지원됩니다. 카메라 권한을 허용해 주세요.</div>
-  <button class="btn secondary hidden" id="manualNext" type="button">다음</button>
-  <div id="toast"></div>
-</section>
-<section class="records">
-<h2>최근 저장 내역</h2><div id="recent"><div class="recordline">아직 저장된 데이터가 없습니다.</div></div>
-</section>
-<div class="status" id="status">저장 데이터는 이 브라우저에 임시 보관됩니다.</div>
-</main>
-<div class="bottom">
-<button class="btn secondary" id="resetFlow" type="button">처음 단계로</button>
-<button class="btn primary" id="downloadBtn" type="button">CSV 다운로드</button>
-</div>
+<section class="card"><div class="step" id="step">1 / 5 단계</div><h1 id="title">로케이션 스캔</h1><p class="hint" id="hint">카메라를 켜고 바코드를 중앙에 맞춘 뒤 촬영/인식 버튼을 누르세요.</p><input id="entry" autocomplete="off" aria-label="입력값">
+<div id="camArea" class="hidden"><div class="camera"><video id="video" autoplay playsinline muted></video><div class="frame"></div></div><div class="actions"><button class="btn secondary" id="capture">촬영 / 인식</button><button class="btn secondary" id="switch">카메라 전환</button></div><p class="note">초록색 테두리 안에 바코드를 맞추고 흔들림 없이 촬영하세요. 여러 개가 인식되면 목록에서 선택합니다.</p><div class="choices" id="choices"></div></div>
+<button class="btn primary full" id="cameraBtn">카메라 켜기</button><button class="btn primary full hidden" id="next">다음</button><div id="msg"></div><p class="note" id="camNote">HTTPS 주소에서 카메라 권한을 허용해야 합니다.</p></section>
+<section class="records"><b>최근 저장 내역</b><div id="recent"></div></section><p class="note" id="status">데이터는 이 브라우저에 저장됩니다.</p></main>
+<div class="bottom"><button class="btn secondary" id="reset">처음 단계로</button><button class="btn primary" id="download">CSV 다운로드</button></div>
 <script>
-(() => {
- const STORAGE_KEY="inventoryData";
- const INIT_KEY="inventoryCameraAppInitialized_v2";
- if(!localStorage.getItem(INIT_KEY)){
-   localStorage.removeItem(STORAGE_KEY);
-   localStorage.setItem(INIT_KEY,"Y");
- }
- const steps=[
-  {key:"location",title:"로케이션 스캔",hint:"카메라로 로케이션 바코드를 비춰 주세요.",scan:true,placeholder:"로케이션 코드"},
-  {key:"barcode",title:"상품코드 스캔",hint:"상품 바코드를 카메라로 비춰 주세요.",scan:true,placeholder:"상품코드"},
-  {key:"packQty",title:"입수 입력",hint:"박스 1개에 들어 있는 수량을 입력하세요.",placeholder:"입수",numeric:true},
-  {key:"boxQty",title:"박스수 입력",hint:"박스 수량을 입력하세요.",placeholder:"박스수",numeric:true},
-  {key:"each",title:"낱개수 입력",hint:"낱개 수량을 입력하세요. Enter 또는 다음 버튼으로 저장합니다.",placeholder:"낱개수",numeric:true}
- ];
- let records=[];
- try{records=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]")}catch(e){records=[]}
- if(!Array.isArray(records))records=[];
- let index=0;
- let current={location:"",barcode:"",packQty:"",boxQty:"",each:""};
- let scanner=null,scanning=false,lastScanAt=0;
- const $=id=>document.getElementById(id), entry=$("entry");
- function updateCount(){$("count").textContent="저장 "+records.length+"건"}
- function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(records));updateCount();renderRecent()}
- function renderRecent(){
-  const el=$("recent");el.replaceChildren();
-  if(!records.length){const d=document.createElement("div");d.className="recordline";d.textContent="아직 저장된 데이터가 없습니다.";el.appendChild(d);return}
-  records.slice(-3).reverse().forEach(r=>{const d=document.createElement("div");d.className="recordline";d.textContent=`${r.location} · ${r.barcode} · 입수 ${r.packQty} · 박스수 ${r.boxQty} · 낱개수 ${r.each}`;el.appendChild(d)})
- }
- function showStep(i){
-  stopScanner();index=i;const s=steps[i];
-  $("stepLabel").textContent=`${i+1} / ${steps.length} 단계`;
-  $("title").textContent=s.title;$("hint").textContent=s.hint;
-  $("progress").querySelectorAll("span").forEach((el,n)=>el.classList.toggle("on",n<=i));
-  entry.value=current[s.key]||"";entry.placeholder=s.placeholder;
-  entry.type=s.numeric?"number":"text";entry.inputMode=s.numeric?"numeric":"text";
-  $("scanBtn").classList.toggle("hidden",!s.scan);$("manualNext").classList.toggle("hidden",!!s.scan);
-  $("cameraNote").classList.toggle("hidden",!s.scan);$("reader").classList.add("hidden");$("toast").style.display="none";
-  setTimeout(()=>entry.focus(),100);
- }
- function stopScanner(){
-  if(scanner&&scanning){const old=scanner;scanning=false;old.stop().catch(()=>{}).finally(()=>{try{old.clear()}catch(e){}})}
-  else if(scanner){try{scanner.clear()}catch(e){}}
-  scanner=null;$("reader").classList.add("hidden");$("scanBtn").textContent="카메라로 스캔";
- }
- async function startScanner(){
-  if(typeof Html5Qrcode==="undefined"){alert("스캔 기능을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");return}
-  $("reader").classList.remove("hidden");$("scanBtn").textContent="카메라 실행 중…";
-  try{
-   scanner=new Html5Qrcode("reader");
-   const config={fps:10,qrbox:{width:Math.min(300,window.innerWidth-100),height:130},aspectRatio:1.5,
-    formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.QR_CODE]};
-   await scanner.start({facingMode:"environment"},config,text=>{
-    const now=Date.now();if(now-lastScanAt<1200)return;lastScanAt=now;
-    entry.value=text;current[steps[index].key]=text;stopScanner();nextStep();
-   },()=>{});
-   scanning=true;$("scanBtn").textContent="카메라 스캔 중";
-  }catch(err){stopScanner();alert("카메라를 시작하지 못했습니다. 카메라 권한을 허용하고 HTTPS 주소에서 열어 주세요.\n"+(err?.message||""))}
- }
- function nextStep(){
-  const s=steps[index],value=entry.value.trim();
-  if(!value){alert(s.title+" 값을 입력하거나 스캔해 주세요.");entry.focus();return}
-  current[s.key]=value;
-  if(index<steps.length-1)showStep(index+1);else saveRecord();
- }
- function saveRecord(){
-  records.push({...current});persist();
-  current={location:"",barcode:"",packQty:"",boxQty:"",each:""};
-  $("status").textContent="저장 완료. 다음 로케이션을 스캔하세요.";
-  showStep(0);
- }
- function csvCell(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
- function downloadCSV(){
-  if(!records.length){alert("다운로드할 데이터가 없습니다.");return}
-  if(!confirm("CSV를 다운로드하고 나면 조사 데이터가 삭제됩니다. 계속할까요?"))return;
-  const rows=[["로케이션","상품코드","입수","박스수","낱개수"],...records.map(r=>[r.location,r.barcode,r.packQty,r.boxQty,r.each])];
-  const blob=new Blob(["\uFEFF"+rows.map(r=>r.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob),a=document.createElement("a"),d=new Date(),p=n=>String(n).padStart(2,"0");
-  a.href=url;a.download=`재고조사_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.csv`;
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>{URL.revokeObjectURL(url);records=[];localStorage.removeItem(STORAGE_KEY);updateCount();renderRecent();$("status").textContent="CSV 다운로드 후 조사 데이터가 초기화되었습니다.";showStep(0)},800);
- }
- $("scanBtn").addEventListener("click",startScanner);
- $("manualNext").addEventListener("click",nextStep);
- entry.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();nextStep()}});
- $("resetFlow").addEventListener("click",()=>{if(confirm("입력 중인 미저장 항목을 지우고 로케이션 단계로 돌아갈까요? 저장된 데이터는 유지됩니다.")){current={location:"",barcode:"",packQty:"",boxQty:"",each:""};showStep(0)}});
- $("downloadBtn").addEventListener("click",downloadCSV);
- window.addEventListener("beforeunload",stopScanner);
- updateCount();renderRecent();showStep(0);
+(()=>{const KEY="inventoryData", $=id=>document.getElementById(id),entry=$("entry"),video=$("video");
+const steps=[
+{key:"location",title:"로케이션 스캔",hint:"카메라를 켜고 로케이션 바코드를 촬영/인식하세요.",scan:true,ph:"로케이션 코드"},
+{key:"barcode",title:"상품코드 스캔",hint:"상품 바코드를 촬영/인식하세요.",scan:true,ph:"상품코드"},
+{key:"packQty",title:"입수 입력",hint:"박스 1개에 들어 있는 수량을 입력하세요.",ph:"입수",num:true},
+{key:"boxQty",title:"박스수 입력",hint:"박스 수량을 입력하세요.",ph:"박스수",num:true},
+{key:"each",title:"낱개수 입력",hint:"낱개 수량을 입력하세요. Enter로 저장할 수 있습니다.",ph:"낱개수",num:true}];
+let records=[];try{records=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){}if(!Array.isArray(records))records=[];
+let i=0,stream=null,facing="environment",current={location:"",barcode:"",packQty:"",boxQty:"",each:""},detector=null,busy=false;
+try{if("BarcodeDetector"in window)detector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","codabar","qr_code"]})}catch(e){}
+function update(){ $("count").textContent="저장 "+records.length+"건";const r=$("recent");r.replaceChildren();if(!records.length){r.textContent="아직 저장된 데이터가 없습니다.";return}records.slice(-3).reverse().forEach(x=>{let d=document.createElement("div");d.className="recordline";d.textContent=`${x.location} · ${x.barcode} · 입수 ${x.packQty} · 박스수 ${x.boxQty} · 낱개수 ${x.each}`;r.appendChild(d)})}
+function msg(t){$("msg").textContent=t;$("msg").style.display="block"}function clearMsg(){$("msg").style.display="none"}
+async function stop(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;$("camArea").classList.add("hidden");$("cameraBtn").classList.remove("hidden");$("cameraBtn").textContent="카메라 켜기";busy=false}
+async function show(n){await stop();i=n;let s=steps[i];$("step").textContent=`${i+1} / ${steps.length} 단계`;$("title").textContent=s.title;$("hint").textContent=s.hint;$("progress").querySelectorAll("span").forEach((x,j)=>x.classList.toggle("on",j<=i));entry.value=current[s.key]||"";entry.placeholder=s.ph;entry.type=s.num?"number":"text";entry.inputMode=s.num?"numeric":"text";$("cameraBtn").classList.toggle("hidden",!s.scan);$("next").classList.toggle("hidden",s.scan);$("camNote").classList.toggle("hidden",!s.scan);$("choices").replaceChildren();clearMsg();if(!s.scan)setTimeout(()=>entry.focus(),100);else if(i===0&&current.location)msg("이전 로케이션이 자동 입력되어 있습니다. 다른 위치면 수정하거나 다시 스캔하세요.")}
+async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;await video.play();$("camArea").classList.remove("hidden");$("cameraBtn").classList.add("hidden");clearMsg()}catch(e){await stop();alert("카메라를 시작하지 못했습니다. HTTPS 주소와 카메라 권한을 확인하세요. "+(e.message||""))}}
+async function switchCam(){facing=facing==="environment"?"user":"environment";await stop();await start()}
+function choose(val){current[steps[i].key]=val;entry.value=val;$("choices").replaceChildren();msg("선택한 바코드: "+val)}
+function displayCandidates(arr){let uniq=[...new Map(arr.filter(x=>x.rawValue).map(x=>[x.rawValue,x])).values()];if(!uniq.length){msg("인식하지 못했습니다. 조명을 밝게 하고 바코드를 더 가까이 맞춰 다시 촬영하세요.");return}if(uniq.length===1){choose(uniq[0].rawValue);return}const c=$("choices");c.replaceChildren();let intro=document.createElement("p");intro.textContent=uniq.length+"개 바코드가 인식됐습니다. 사용할 코드를 선택하세요.";c.appendChild(intro);uniq.forEach((x,n)=>{let b=document.createElement("button");b.className="choice";b.type="button";b.textContent=x.rawValue;let small=document.createElement("small");small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;b.appendChild(small);b.onclick=()=>choose(x.rawValue);c.appendChild(b)})}
+async function capture(){if(!stream){await start();if(!stream)return}if(busy)return;busy=true;$("capture").textContent="인식 중…";try{if(detector){displayCandidates(await detector.detect(video))}else{if(typeof Html5Qrcode==="undefined")throw Error("인식 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.");let canvas=document.createElement("canvas");canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);let blob=await new Promise(res=>canvas.toBlob(res,"image/png"));let file=new File([blob],"capture.png",{type:"image/png"});let el=document.createElement("div");el.id="stillScan"+Date.now();el.style.display="none";document.body.appendChild(el);let qr=new Html5Qrcode(el.id);try{let result=await qr.scanFile(file,true);displayCandidates([{rawValue:result,format:"barcode"}])}catch(e){msg("인식하지 못했습니다. 조명을 밝게 하고 다시 촬영하세요.")}finally{try{await qr.clear()}catch(e){}el.remove()}}}catch(e){msg("바코드 인식에 실패했습니다. 초점과 조명을 확인하고 다시 촬영하세요.")}finally{busy=false;$("capture").textContent="촬영 / 인식"}}
+function next(){let s=steps[i],v=entry.value.trim();if(!v){alert(s.title+" 값을 입력하거나 스캔하세요.");entry.focus();return}current[s.key]=v;if(i<steps.length-1)show(i+1);else save()}
+function save(){records.push({...current});localStorage.setItem(KEY,JSON.stringify(records));let loc=current.location;current={location:loc,barcode:"",packQty:"",boxQty:"",each:""};update();$("status").textContent="저장 완료. 같은 로케이션이면 그대로 두고 상품코드만 스캔하세요.";show(0)}
+function csv(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
+function download(){if(!records.length){alert("다운로드할 데이터가 없습니다.");return}if(!confirm("CSV 다운로드 후 조사 데이터를 초기화할까요?"))return;let rows=[["로케이션","상품코드","입수","박스수","낱개수"],...records.map(r=>[r.location,r.barcode,r.packQty,r.boxQty,r.each])];let blob=new Blob(["\uFEFF"+rows.map(r=>r.map(csv).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),a=document.createElement("a"),d=new Date(),p=n=>String(n).padStart(2,"0");a.href=url;a.download=`재고조사_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>{URL.revokeObjectURL(url);records=[];localStorage.removeItem(KEY);current={location:"",barcode:"",packQty:"",boxQty:"",each:""};update();$("status").textContent="CSV 다운로드 후 데이터가 초기화되었습니다.";show(0)},800)}
+$("cameraBtn").onclick=start;$("capture").onclick=capture;$("switch").onclick=switchCam;$("next").onclick=next;entry.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();next()}});$("reset").onclick=()=>{if(confirm("입력 중인 항목을 초기화할까요? 저장된 데이터는 유지됩니다.")){current={location:current.location,barcode:"",packQty:"",boxQty:"",each:""};show(0)}};$("download").onclick=download;window.addEventListener("beforeunload",()=>stream&&stream.getTracks().forEach(t=>t.stop()));update();show(0)
 })();
-</script>
-</body>
-</html>
+</script></body></html>
