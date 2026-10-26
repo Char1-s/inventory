@@ -1,200 +1,680 @@
-<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>카메라 재고조사</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>재고조사 도우미</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#172033;font-family:system-ui,sans-serif}header{background:#16324f;color:white;padding:16px;font-size:20px;font-weight:bold}#count{float:right;font-size:14px}main{max-width:560px;margin:auto;padding:16px 14px 100px}.card,.records{background:white;border-radius:16px;padding:20px;margin-bottom:14px}.step{color:#1769e0;font-size:13px;font-weight:bold}h1{font-size:27px;margin:8px 0}.hint,.note{color:#657187;font-size:14px;line-height:1.5}input{width:100%;height:60px;border:2px solid #d9e0ea;border-radius:12px;font-size:23px;text-align:center;padding:10px}.btn{border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:bold;min-height:50px;cursor:pointer}.primary{background:#1769e0;color:white}.secondary{background:#e9eef5;color:#23344d}.full{width:100%;margin-top:12px}.hidden{display:none!important}.progress{display:flex;gap:5px;margin-bottom:16px}.progress span{height:5px;flex:1;background:#d4dbe5;border-radius:8px}.progress .on{background:#2474e5}.camera{position:relative;margin-top:14px;background:#111;border-radius:12px;overflow:hidden}.camera video{display:block;width:100%;max-height:48vh;object-fit:cover}.frame{position:absolute;top:34%;left:7%;right:7%;height:32%;border:2px solid #31e58b;border-radius:10px;pointer-events:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.actions button{width:100%}.choices{display:grid;gap:8px;margin-top:10px}.choice{border:1px solid #d9e2ef;border-radius:10px;padding:12px;text-align:left;font-size:17px;background:#f5f8fc;overflow-wrap:anywhere}.choice small{display:block;color:#657187}.bottom{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;background:#ffffffed;padding:10px}.bottom button{flex:1}.recordline{padding:8px 0;border-bottom:1px solid #eee;font-size:13px;overflow-wrap:anywhere}#msg{display:none;background:#e7f8ee;color:#12603b;padding:10px;border-radius:10px;margin-top:10px;font-size:14px}
-</style></head><body><header>카메라 재고조사 <span id="count">저장 0건</span></header><main>
-<div class="progress" id="progress"><span class="on"></span><span></span><span></span><span></span><span></span></div>
-<section class="card"><div class="step" id="step">1 / 5 단계</div><h1 id="title">로케이션 스캔</h1><p class="hint" id="hint">카메라를 켜고 바코드를 중앙에 맞춘 뒤 촬영/인식 버튼을 누르세요.</p><input id="entry" autocomplete="off" aria-label="입력값">
-<div id="camArea" class="hidden"><div class="camera"><video id="video" autoplay playsinline muted></video><div class="frame"></div></div><div class="actions"><button class="btn secondary" id="capture">촬영 / 인식</button><button class="btn secondary" id="refreshCam">카메라 새로고침</button></div><p class="note">초록색 테두리 안에 바코드를 맞추고 흔들림 없이 촬영하세요. 여러 개가 인식되면 목록에서 선택합니다.</p><div class="choices" id="choices"></div></div>
-<button class="btn primary full" id="cameraBtn">카메라 켜기</button>
-<button class="btn primary full hidden" id="next">다음</button>
-<div id="msg"></div><p class="note" id="camNote">HTTPS 주소에서 카메라 권한을 허용해야 합니다.</p></section>
-<section class="records"><b>최근 저장 내역</b><div id="recent"></div></section><p class="note" id="status">데이터는 이 브라우저에 저장됩니다.</p></main>
-<div class="bottom"><button class="btn secondary" id="reset">처음 단계로</button><button class="btn primary" id="download">CSV 다운로드</button></div>
+:root {
+  font-family: Arial, "Malgun Gothic", sans-serif;
+  color: #172033;
+  background: #f1f5f9;
+}
+* { box-sizing: border-box; }
+body { margin: 0; height: 100dvh; overflow: hidden; }
+button, input { font: inherit; }
+button {
+  border: 0; border-radius: 10px; padding: 11px;
+  font-weight: 700; cursor: pointer;
+}
+button:disabled { opacity: .4; }
+.app {
+  height: 100dvh; max-width: 950px; margin: auto;
+  padding: 8px; display: flex; flex-direction: column; gap: 7px;
+}
+header {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 8px;
+}
+h1 { font-size: 19px; margin: 0; }
+.small { font-size: 11px; color: #64748b; margin-top: 3px; }
+.badge {
+  background: #dbeafe; color: #1d4ed8;
+  border-radius: 20px; padding: 7px 10px;
+  font-size: 12px; font-weight: 800; white-space: nowrap;
+}
+.steps { display: flex; gap: 4px; }
+.step {
+  flex: 1; padding: 8px 1px; border-radius: 7px;
+  text-align: center; font-size: 10px;
+  background: #e2e8f0; color: #64748b; font-weight: 700;
+}
+.step.active { background: #2563eb; color: white; }
+.step.done { background: #bfdbfe; color: #1d4ed8; }
+.panel {
+  background: white; border: 1px solid #e2e8f0;
+  border-radius: 13px; padding: 11px; min-width: 0;
+}
+.main { flex: 0 0 auto; }
+.step-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+.hint { font-size: 12px; color: #64748b; margin: 0 0 9px; }
+label {
+  display: block; font-size: 12px; font-weight: 700;
+  margin-bottom: 5px; color: #475569;
+}
+input {
+  display: block; width: 100%; min-width: 0;
+  border: 1px solid #cbd5e1; border-radius: 10px;
+  padding: 12px; font-size: 18px; background: white;
+}
+input:focus { outline: 2px solid #93c5fd; }
+.camera { display: none; margin-top: 8px; }
+.camera.show { display: block; }
+.video-wrap {
+  height: clamp(95px, 18dvh, 165px);
+  background: #0f172a; border-radius: 10px;
+  overflow: hidden; position: relative;
+}
+video { width: 100%; height: 100%; object-fit: cover; }
+.cam-placeholder {
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  color: white; text-align: center; font-size: 12px;
+  padding: 10px; pointer-events: none;
+}
+.camera-actions, .controls, .record-actions {
+  display: flex; gap: 7px; margin-top: 8px;
+}
+.camera-actions button, .controls button { flex: 1; }
+.primary { background: #2563eb; color: white; }
+.secondary { background: #e2e8f0; color: #1e293b; }
+.danger { background: #fee2e2; color: #991b1b; }
+.camera-actions button { font-size: 12px; padding: 10px 5px; }
+.records {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.record-head {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 6px; margin-bottom: 7px;
+}
+.record-head h2 { font-size: 14px; margin: 0; }
+.count { font-size: 11px; color: #64748b; margin-top: 3px; }
+.record-actions { margin: 0; }
+.record-actions button { font-size: 11px; padding: 8px; white-space: nowrap; }
+.table-wrap {
+  flex: 1; min-height: 0; overflow: auto;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 11px; }
+th, td {
+  padding: 8px 6px; border-bottom: 1px solid #e2e8f0;
+  text-align: left; white-space: nowrap;
+}
+th { background: #f8fafc; position: sticky; top: 0; z-index: 1; }
+td.num { text-align: right; }
+.del { background: #fee2e2; color: #991b1b; padding: 5px 7px; font-size: 10px; }
+.empty { text-align: center; padding: 18px; color: #94a3b8; }
+footer { text-align: center; font-size: 10px; color: #94a3b8; }
+.overlay {
+  display: none; position: fixed; inset: 0; z-index: 10;
+  background: #0009; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.overlay.open { display: flex; }
+.modal {
+  background: white; width: min(420px, 100%);
+  padding: 18px; border-radius: 15px;
+}
+.modal h2 { font-size: 18px; margin: 0 0 8px; }
+.modal p { font-size: 13px; color: #64748b; overflow-wrap: anywhere; }
+.scanned {
+  padding: 14px; background: #f1f5f9;
+  border-radius: 9px; font-size: 21px; font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions button { flex: 1; }
+.candidates { display: grid; gap: 7px; max-height: 40dvh; overflow: auto; }
+.candidate { background: #eff6ff; text-align: left; overflow-wrap: anywhere; }
+#toast {
+  display: none; position: fixed; z-index: 20;
+  bottom: 12px; left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 90%;
+  padding: 10px 14px; border-radius: 9px;
+  color: white; background: #172033; font-size: 12px;
+}
+#toast.show { display: block; }
+@media(max-width: 420px) {
+  .app { padding: 6px; gap: 5px; }
+  h1 { font-size: 17px; }
+  .panel { padding: 9px; }
+  .step { font-size: 9px; }
+  .record-actions { gap: 4px; }
+  .record-actions button { padding: 7px 5px; font-size: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>📦 재고조사 도우미</h1>
+      <div class="small">한 단계씩 입력하고 CSV로 저장하세요.</div>
+    </div>
+    <div class="badge" id="stepCount">1 / 5</div>
+  </header>
+
+  <div class="steps" id="steps">
+    <div class="step active">1 로케이션</div>
+    <div class="step">2 바코드</div>
+    <div class="step">3 입수</div>
+    <div class="step">4 박스 수</div>
+    <div class="step">5 낱개 수</div>
+  </div>
+
+  <section class="panel main">
+    <div class="step-title" id="stepTitle">로케이션 입력</div>
+    <p class="hint" id="stepHint">로케이션을 입력하거나 카메라로 스캔하세요.</p>
+
+    <label id="fieldLabel" for="fieldInput">로케이션 코드</label>
+    <input id="fieldInput" autocomplete="off" placeholder="예: A-01-02">
+
+    <div class="camera show" id="cameraArea">
+      <div class="video-wrap">
+        <video id="video" autoplay muted playsinline></video>
+        <div class="cam-placeholder" id="camPlaceholder">
+          카메라를 시작해 주세요.
+        </div>
+      </div>
+      <div class="camera-actions">
+        <button class="secondary" id="startCamera">📷 카메라 시작 / 새로고침</button>
+        <button class="primary" id="capture">◎ 촬영 · 인식</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="secondary" id="backBtn" disabled>← 이전</button>
+      <button class="primary" id="nextBtn">다음 →</button>
+    </div>
+  </section>
+
+  <section class="panel records">
+    <div class="record-head">
+      <div>
+        <h2>입력한 재고 목록</h2>
+        <div class="count" id="recordCount">0건 입력됨</div>
+      </div>
+      <div class="record-actions">
+        <button class="secondary" id="csvBtn">CSV 다운로드</button>
+        <button class="secondary" id="clearBtn">전체 삭제</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>로케이션</th><th>상품 바코드</th>
+            <th>입수</th><th>박스 수</th><th>낱개 수</th><th>삭제</th>
+          </tr>
+        </thead>
+        <tbody id="recordBody">
+          <tr><td colspan="7" class="empty">아직 입력한 데이터가 없습니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>카메라 사용에는 HTTPS 및 브라우저 권한이 필요합니다.</footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h2 id="modalTitle">스캔 확인</h2>
+    <p id="modalText">인식한 내용이 맞습니까?</p>
+    <div id="modalContent"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
 <script>
-(()=>{const KEY="inventoryData", $=id=>document.getElementById(id),entry=$("entry"),video=$("video");
-const steps=[
-{key:"location",title:"로케이션 스캔",hint:"카메라를 켜고 로케이션 바코드를 촬영/인식하세요.",scan:true,ph:"로케이션 코드"},
-{key:"barcode",title:"상품코드 스캔",hint:"상품 바코드를 촬영/인식하세요.",scan:true,ph:"상품코드"},
-{key:"packQty",title:"입수 입력",hint:"박스 1개에 들어 있는 수량을 입력하세요.",ph:"입수",num:true},
-{key:"boxQty",title:"박스수 입력",hint:"박스 수량을 입력하세요.",ph:"박스수",num:true},
-{key:"each",title:"낱개수 입력",hint:"낱개 수량을 입력하세요. Enter 또는 저장 버튼을 누르면 저장됩니다.",ph:"낱개수",num:true}];
-let records=[];try{records=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){}if(!Array.isArray(records))records=[];
-let i=0,stream=null,facing="environment",current={location:"",barcode:"",packQty:"",boxQty:"",each:""},detector=null,busy=false;
+(() => {
+  "use strict";
 
-// Code128, EAN13 중심 전체 지원 포맷 명시
-try{if("BarcodeDetector"in window)detector=new BarcodeDetector({formats:["code_128","ean_13","code_39","code_93","codabar","ean_8","itf","qr_code","upc_a","upc_e"]})}catch(e){}
+  const $ = id => document.getElementById(id);
 
-function update(){ $("count").textContent="저장 "+records.length+"건";const r=$("recent");r.replaceChildren();if(!records.length){r.textContent="아직 저장된 데이터가 없습니다.";return}records.slice(-3).reverse().forEach(x=>{let d=document.createElement("div");d.className="recordline";d.textContent=`${x.location} · ${x.barcode} · 입수 ${x.packQty} · 박스수 ${x.boxQty} · 낱개수 ${x.each}`;r.appendChild(d)})}
-function msg(t){$("msg").textContent=t;$("msg").style.display="block"}function clearMsg(){$("msg").style.display="none"}
-async function stop(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;$("camArea").classList.add("hidden");$("cameraBtn").classList.remove("hidden");$("cameraBtn").textContent="카메라 켜기";busy=false}
-
-async function show(n){
-  await stop();
-  i=n;
-  let s=steps[i];
-  $("step").textContent=`${i+1} / ${steps.length} 단계`;
-  $("title").textContent=s.title;
-  $("hint").textContent=s.hint;
-  $("progress").querySelectorAll("span").forEach((x,j)=>x.classList.toggle("on",j<=i));
-  entry.value=current[s.key]||"";
-  entry.placeholder=s.ph;
-  entry.type=s.num?"number":"text";
-  entry.inputMode=s.num?"numeric":"text";
-  
-  $("cameraBtn").classList.toggle("hidden",!s.scan);
-  // 스캔 단계가 아닌 경우(입력 단계) 항상 '다음' 또는 '저장' 버튼 노출
-  $("next").classList.toggle("hidden",s.scan);
-  $("next").textContent = (i === steps.length - 1) ? "저장하기" : "다음";
-  $("camNote").classList.toggle("hidden",!s.scan);
-  
-  $("choices").replaceChildren();
-  clearMsg();
-  if(!s.scan)setTimeout(()=>entry.focus(),100);
-  else if(i===0&&current.location)msg("이전 로케이션이 자동 입력되어 있습니다. 다른 위치면 수정하거나 다시 스캔하세요.");
-}
-
-async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;await video.play();$("camArea").classList.remove("hidden");$("cameraBtn").classList.add("hidden");clearMsg()}catch(e){await stop();alert("카메라를 시작하지 못했습니다. HTTPS 주소와 카메라 권한을 확인하세요. "+(e.message||""))}}
-async function refreshCam(){await stop();await start()}
-
-function choose(val){
-  current[steps[i].key]=val;
-  entry.value=val;
-  $("choices").replaceChildren();
-  next();
-}
-
-function displayCandidates(arr){
-  let uniq=[...new Map(arr.filter(x=>x.rawValue).map(x=>[x.rawValue,x])).values()];
-  if(!uniq.length){msg("인식하지 못했습니다. 조명을 밝게 하고 바코드를 더 가까이 맞춰 다시 촬영하세요.");return}
-  
-  if(uniq.length===1){
-    const detected=uniq[0].rawValue;
-    if(confirm("인식된 바코드가 맞습니까?\n\n["+detected+"]")){
-      choose(detected);
-    }else{
-      entry.value="";
-      current[steps[i].key]="";
-      msg("확인 취소됨. 바코드를 다시 맞추고 촬영 / 인식 버튼을 눌러 주세요.");
+  const config = [
+    {
+      title: "로케이션 입력",
+      hint: "조사할 위치 코드를 입력하거나 카메라로 스캔하세요.",
+      label: "로케이션 코드",
+      placeholder: "예: A-01-02"
+    },
+    {
+      title: "상품 바코드 입력",
+      hint: "상품 바코드를 입력하거나 카메라로 스캔하세요.",
+      label: "상품 바코드",
+      placeholder: "바코드 숫자 또는 문자"
+    },
+    {
+      title: "입수 입력",
+      hint: "한 박스에 들어 있는 수량을 입력하세요.",
+      label: "입수",
+      placeholder: "예: 12"
+    },
+    {
+      title: "박스 수 입력",
+      hint: "해당 상품의 박스 수를 입력하세요.",
+      label: "박스 수",
+      placeholder: "예: 3"
+    },
+    {
+      title: "낱개 수 입력",
+      hint: "박스 외 낱개 수량을 입력하세요.",
+      label: "낱개 수",
+      placeholder: "예: 4"
     }
-    return;
-  }
-  
-  const c=$("choices");
-  c.replaceChildren();
-  let intro=document.createElement("p");
-  intro.textContent=uniq.length+"개 바코드가 인식됐습니다. 사용할 코드를 선택하세요.";
-  c.appendChild(intro);
-  uniq.forEach((x,n)=>{
-    let b=document.createElement("button");
-    b.className="choice";
-    b.type="button";
-    b.textContent=x.rawValue;
-    let small=document.createElement("small");
-    small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;
-    b.appendChild(small);
-    b.onclick=()=>choose(x.rawValue);
-    c.appendChild(b);
-  });
-}
+  ];
 
-async function capture(){
-  if(!stream){await start();if(!stream)return}
-  if(busy)return;
-  busy=true;
-  $("capture").textContent="인식 중…";
-  try{
-    if(detector){
-      displayCandidates(await detector.detect(video));
-    }else{
-      if(typeof Html5Qrcode==="undefined")throw Error("인식 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.");
-      let canvas=document.createElement("canvas");
-      canvas.width=video.videoWidth;
-      canvas.height=video.videoHeight;
-      canvas.getContext("2d").drawImage(video,0,0);
-      let blob=await new Promise(res=>canvas.toBlob(res,"image/png"));
-      let file=new File([blob],"capture.png",{type:"image/png"});
-      let el=document.createElement("div");
-      el.id="stillScan"+Date.now();
-      el.style.display="none";
-      document.body.appendChild(el);
-      let qr=new Html5Qrcode(el.id);
-      try{
-        let result=await qr.scanFile(file,true);
-        displayCandidates([{rawValue:result,format:"barcode"}]);
-      }catch(e){
-        msg("인식하지 못했습니다. 조명을 밝게 하고 다시 촬영하세요.");
-      }finally{
-        try{await qr.clear()}catch(e){}
-        el.remove();
+  let step = 0;
+  let values = ["", "", "", "", ""];
+  let records = [];
+  let stream = null;
+  let detector = null;
+  let scanBusy = false;
+  let toastTimer = null;
+
+  const video = $("video");
+
+  function toast(message) {
+    const el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    video.srcObject = null;
+    $("camPlaceholder").style.display = "flex";
+    $("camPlaceholder").textContent = "카메라가 꺼져 있습니다. 시작 버튼을 눌러주세요.";
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast("카메라를 사용할 수 없습니다. HTTPS 연결을 확인하세요.");
+      return;
+    }
+
+    stopCamera();
+    detector = null;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      video.srcObject = stream;
+      await video.play();
+      $("camPlaceholder").style.display = "none";
+
+      if ("BarcodeDetector" in window) {
+        try {
+          detector = new BarcodeDetector({
+            formats: [
+              "qr_code", "code_128", "code_39", "ean_13",
+              "ean_8", "upc_a", "upc_e", "itf", "codabar",
+              "data_matrix"
+            ]
+          });
+        } catch {
+          try {
+            detector = new BarcodeDetector();
+          } catch {
+            detector = null;
+          }
+        }
+      }
+
+      toast(detector
+        ? "카메라 준비 완료! 촬영·인식 버튼을 누르세요."
+        : "카메라가 켜졌습니다. 자동 인식 미지원 시 직접 입력하세요.");
+    } catch (error) {
+      stopCamera();
+      toast("카메라를 시작하지 못했습니다. 권한을 확인하세요.");
+    }
+  }
+
+  function render() {
+    const c = config[step];
+
+    $("stepCount").textContent = `${step + 1} / 5`;
+    $("stepTitle").textContent = c.title;
+    $("stepHint").textContent = c.hint;
+    $("fieldLabel").textContent = c.label;
+    $("fieldInput").placeholder = c.placeholder;
+    $("fieldInput").value = values[step];
+    $("fieldInput").type = step >= 2 ? "number" : "text";
+    $("fieldInput").inputMode = step >= 2 ? "numeric" : "text";
+    $("fieldInput").min = "0";
+    $("fieldInput").step = "1";
+
+    $("cameraArea").classList.toggle("show", step < 2);
+    $("backBtn").disabled = step === 0;
+    $("nextBtn").textContent = step === 4 ? "✓ 저장하기" : "다음 →";
+
+    [...$("steps").children].forEach((el, i) => {
+      el.className = "step" + (
+        i === step ? " active" : i < step ? " done" : ""
+      );
+    });
+
+    if (step >= 2 && stream) stopCamera();
+    renderRecords();
+  }
+
+  function renderRecords() {
+    $("recordCount").textContent = `${records.length}건 입력됨`;
+
+    const body = $("recordBody");
+    body.replaceChildren();
+
+    if (records.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 7;
+      td.className = "empty";
+      td.textContent = "아직 입력한 데이터가 없습니다.";
+      tr.appendChild(td);
+      body.appendChild(tr);
+      return;
+    }
+
+    records.forEach((r, i) => {
+      const tr = document.createElement("tr");
+
+      [
+        i + 1, r.location, r.barcode,
+        r.pack, r.boxes, r.each
+      ].forEach((value, j) => {
+        const td = document.createElement("td");
+        td.textContent = value;
+        if (j >= 3) td.className = "num";
+        tr.appendChild(td);
+      });
+
+      const td = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.className = "del";
+      btn.textContent = "삭제";
+      btn.addEventListener("click", () => {
+        records.splice(i, 1);
+        renderRecords();
+      });
+      td.appendChild(btn);
+      tr.appendChild(td);
+      body.appendChild(tr);
+    });
+  }
+
+  function closeModal() {
+    $("overlay").classList.remove("open");
+  }
+
+  function showModal(title, message, content, actions) {
+    $("modalTitle").textContent = title;
+    $("modalText").textContent = message;
+
+    const area = $("modalContent");
+    area.replaceChildren();
+    if (content) area.appendChild(content);
+
+    const buttons = $("modalActions");
+    buttons.replaceChildren();
+
+    actions.forEach(action => {
+      const btn = document.createElement("button");
+      btn.className = action.className || "secondary";
+      btn.textContent = action.label;
+      btn.addEventListener("click", () => {
+        closeModal();
+        action.run();
+      });
+      buttons.appendChild(btn);
+    });
+
+    $("overlay").classList.add("open");
+  }
+
+  function confirmScan(text) {
+    const value = String(text || "").trim();
+    if (!value) return;
+
+    const type = step === 0 ? "로케이션 코드" : "상품 바코드";
+    const content = document.createElement("div");
+    content.className = "scanned";
+    content.textContent = value;
+
+    showModal(
+      "스캔 결과 확인",
+      `${type}가 맞습니까?`,
+      content,
+      [
+        {
+          label: "다시 스캔",
+          className: "secondary",
+          run: () => {}
+        },
+        {
+          label: "맞습니다 · 다음",
+          className: "primary",
+          run: () => {
+            values[step] = value;
+            if (step < 4) step++;
+            render();
+          }
+        }
+      ]
+    );
+  }
+
+  async function captureBarcode() {
+    if (scanBusy) return;
+
+    if (!stream) {
+      toast("먼저 카메라 시작 / 새로고침을 눌러주세요.");
+      return;
+    }
+
+    if (!detector) {
+      toast("자동 인식 미지원 브라우저입니다. 바코드를 직접 입력하세요.");
+      $("fieldInput").focus();
+      return;
+    }
+
+    if (video.readyState < 2) {
+      toast("카메라 화면을 준비 중입니다. 다시 눌러주세요.");
+      return;
+    }
+
+    scanBusy = true;
+
+    try {
+      const results = await detector.detect(video);
+      const found = [...new Set(
+        results.map(item => item.rawValue?.trim()).filter(Boolean)
+      )];
+
+      if (found.length === 0) {
+        toast("바코드를 찾지 못했습니다. 위치를 조정하거나 새로고침하세요.");
+        return;
+      }
+
+      if (found.length === 1) {
+        confirmScan(found[0]);
+        return;
+      }
+
+      const list = document.createElement("div");
+      list.className = "candidates";
+
+      found.forEach(value => {
+        const btn = document.createElement("button");
+        btn.className = "candidate";
+        btn.textContent = value;
+        btn.addEventListener("click", () => {
+          closeModal();
+          confirmScan(value);
+        });
+        list.appendChild(btn);
+      });
+
+      showModal(
+        "바코드 선택",
+        "여러 개가 인식됐습니다. 사용할 바코드를 선택하세요.",
+        list,
+        [{ label: "취소", run: () => {} }]
+      );
+    } catch (error) {
+      toast("인식에 실패했습니다. 카메라 새로고침 후 다시 시도하세요.");
+    } finally {
+      scanBusy = false;
+    }
+  }
+
+  function nextStep() {
+    const value = $("fieldInput").value.trim();
+
+    if (!value) {
+      toast("값을 입력해주세요.");
+      $("fieldInput").focus();
+      return;
+    }
+
+    if (step >= 2) {
+      const number = Number(value);
+      if (!Number.isSafeInteger(number) || number < 0) {
+        toast("0 이상의 정수를 입력해주세요.");
+        return;
       }
     }
-  }catch(e){
-    msg("바코드 인식에 실패했습니다. 초점과 조명을 확인하고 다시 촬영하세요.");
-  }finally{
-    busy=false;
-    $("capture").textContent="촬영 / 인식";
+
+    values[step] = value;
+
+    if (step < 4) {
+      step++;
+      render();
+      $("fieldInput").focus();
+      return;
+    }
+
+    records.push({
+      location: values[0],
+      barcode: values[1],
+      pack: values[2],
+      boxes: values[3],
+      each: values[4]
+    });
+
+    // 다음 상품은 같은 로케이션에서 계속 조사
+    values = [values[0], "", "", "", ""];
+    step = 1;
+    render();
+    toast("재고 1건 저장 완료! 다음 상품 바코드를 입력하세요.");
+    $("fieldInput").focus();
   }
-}
 
-function next(){
-  let s=steps[i],v=entry.value.trim();
-  if(!v){
-    alert(s.title+" 값을 입력하거나 스캔하세요.");
-    entry.focus();
-    return;
+  function previousStep() {
+    values[step] = $("fieldInput").value.trim();
+    if (step > 0) {
+      step--;
+      render();
+    }
   }
-  current[s.key]=v;
-  if(i<steps.length-1) show(i+1);
-  else save();
-}
 
-function save(){
-  records.push({...current});
-  localStorage.setItem(KEY,JSON.stringify(records));
-  let loc=current.location;
-  current={location:loc,barcode:"",packQty:"",boxQty:"",each:""};
-  update();
-  $("status").textContent="저장 완료. 같은 로케이션이면 그대로 두고 상품코드만 스캔하세요.";
-  show(0);
-}
+  function downloadCSV() {
+    if (!records.length) {
+      toast("다운로드할 데이터가 없습니다.");
+      return;
+    }
 
-function csv(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
-function download(){
-  if(!records.length){alert("다운로드할 데이터가 없습니다.");return}
-  if(!confirm("CSV 다운로드 후 조사 데이터를 초기화할까요?"))return;
-  let rows=[["로케이션","상품코드","입수","박스수","낱개수"],...records.map(r=>[r.location,r.barcode,r.packQty,r.boxQty,r.each])];
-  let blob=new Blob(["\uFEFF"+rows.map(r=>r.map(csv).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8;"}),
-      url=URL.createObjectURL(blob),
-      a=document.createElement("a"),
-      d=new Date(),
-      p=n=>String(n).padStart(2,"0");
-  a.href=url;
-  a.download=`재고조사_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>{
-    URL.revokeObjectURL(url);
-    records=[];
-    localStorage.removeItem(KEY);
-    current={location:"",barcode:"",packQty:"",boxQty:"",each:""};
-    update();
-    $("status").textContent="CSV 다운로드 후 데이터가 초기화되었습니다.";
-    show(0);
-  },800);
-}
+    const rows = [
+      ["로케이션", "상품바코드", "입수", "박스수", "낱개수"],
+      ...records.map(r => [
+        r.location, r.barcode, r.pack, r.boxes, r.each
+      ])
+    ];
 
-$("cameraBtn").onclick=start;
-$("capture").onclick=capture;
-$("refreshCam").onclick=refreshCam;
-$("next").onclick=next;
-entry.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();next()}});
-$("reset").onclick=()=>{if(confirm("입력 중인 항목을 초기화할까요? 저장된 데이터는 유지됩니다.")){current={location:current.location,barcode:"",packQty:"",boxQty:"",each:""};show(0)}};
-$("download").onclick=download;
-window.addEventListener("beforeunload",()=>stream&&stream.getTracks().forEach(t=>t.stop()));
-update();
-show(0);
+    const csv = "\uFEFF" + rows.map(row =>
+      row.map(value =>
+        '"' + String(value ?? "").replace(/"/g, '""') + '"'
+      ).join(",")
+    ).join("\r\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "재고조사_" +
+      new Date().toISOString().slice(0, 10) + ".csv";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  $("startCamera").addEventListener("click", startCamera);
+  $("capture").addEventListener("click", captureBarcode);
+  $("nextBtn").addEventListener("click", nextStep);
+  $("backBtn").addEventListener("click", previousStep);
+  $("csvBtn").addEventListener("click", downloadCSV);
+
+  $("fieldInput").addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      nextStep();
+    }
+  });
+
+  $("clearBtn").addEventListener("click", () => {
+    if (!records.length) {
+      toast("삭제할 데이터가 없습니다.");
+      return;
+    }
+
+    showModal(
+      "전체 데이터 삭제",
+      `${records.length}건을 모두 삭제할까요?`,
+      null,
+      [
+        { label: "취소", run: () => {} },
+        {
+          label: "모두 삭제",
+          className: "danger",
+          run: () => {
+            records = [];
+            renderRecords();
+            toast("전체 목록을 삭제했습니다.");
+          }
+        }
+      ]
+    );
+  });
+
+  $("overlay").addEventListener("click", event => {
+    if (event.target === $("overlay")) closeModal();
+  });
+
+  window.addEventListener("pagehide", stopCamera);
+
+  render();
 })();
-</script></body></html>
+</script>
+</body>
+</html>
