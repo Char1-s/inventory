@@ -90,3 +90,111 @@ function displayCandidates(arr){
     let b=document.createElement("button");
     b.className="choice";
     b.type="button";
+    b.textContent=x.rawValue;
+    let small=document.createElement("small");
+    small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;
+    b.appendChild(small);
+    b.onclick=()=>choose(x.rawValue);
+    c.appendChild(b);
+  });
+}
+
+async function capture(){
+  if(!stream){await start();if(!stream)return}
+  if(busy)return;
+  busy=true;
+  $("capture").textContent="인식 중…";
+  try{
+    if(detector){
+      displayCandidates(await detector.detect(video));
+    }else{
+      if(typeof Html5Qrcode==="undefined")throw Error("인식 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.");
+      let canvas=document.createElement("canvas");
+      canvas.width=video.videoWidth;
+      canvas.height=video.videoHeight;
+      canvas.getContext("2d").drawImage(video,0,0);
+      let blob=await new Promise(res=>canvas.toBlob(res,"image/png"));
+      let file=new File([blob],"capture.png",{type:"image/png"});
+      let el=document.createElement("div");
+      el.id="stillScan"+Date.now();
+      el.style.display="none";
+      document.body.appendChild(el);
+      let qr=new Html5Qrcode(el.id);
+      try{
+        let result=await qr.scanFile(file,true);
+        displayCandidates([{rawValue:result,format:"barcode"}]);
+      }catch(e){
+        msg("인식하지 못했습니다. 조명을 밝게 하고 다시 촬영하세요.");
+      }finally{
+        try{await qr.clear()}catch(e){}
+        el.remove();
+      }
+    }
+  }catch(e){
+    msg("바코드 인식에 실패했습니다. 초점과 조명을 확인하고 다시 촬영하세요.");
+  }finally{
+    busy=false;
+    $("capture").textContent="촬영 / 인식";
+  }
+}
+
+function next(){
+  let s=steps[i],v=entry.value.trim();
+  if(!v){
+    alert(s.title+" 값을 입력하거나 스캔하세요.");
+    entry.focus();
+    return;
+  }
+  current[s.key]=v;
+  if(i<steps.length-1) show(i+1);
+  else save();
+}
+
+function save(){
+  records.push({...current});
+  localStorage.setItem(KEY,JSON.stringify(records));
+  let loc=current.location;
+  current={location:loc,barcode:"",packQty:"",boxQty:"",each:""};
+  update();
+  $("status").textContent="저장 완료. 같은 로케이션이면 그대로 두고 상품코드만 스캔하세요.";
+  show(0);
+}
+
+function csv(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
+function download(){
+  if(!records.length){alert("다운로드할 데이터가 없습니다.");return}
+  if(!confirm("CSV 다운로드 후 조사 데이터를 초기화할까요?"))return;
+  let rows=[["로케이션","상품코드","입수","박스수","낱개수"],...records.map(r=>[r.location,r.barcode,r.packQty,r.boxQty,r.each])];
+  let blob=new Blob(["\uFEFF"+rows.map(r=>r.map(csv).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8;"}),
+      url=URL.createObjectURL(blob),
+      a=document.createElement("a"),
+      d=new Date(),
+      p=n=>String(n).padStart(2,"0");
+  a.href=url;
+  a.download=`재고조사_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>{
+    URL.revokeObjectURL(url);
+    records=[];
+    localStorage.removeItem(KEY);
+    current={location:"",barcode:"",packQty:"",boxQty:"",each:""};
+    update();
+    $("status").textContent="CSV 다운로드 후 데이터가 초기화되었습니다.";
+    show(0);
+  },800);
+}
+
+$("cameraBtn").onclick=start;
+$("capture").onclick=capture;
+$("refreshCam").onclick=refreshCam;
+$("next").onclick=next;
+entry.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();next()}});
+$("reset").onclick=()=>{if(confirm("입력 중인 항목을 초기화할까요? 저장된 데이터는 유지됩니다.")){current={location:current.location,barcode:"",packQty:"",boxQty:"",each:""};show(0)}};
+$("download").onclick=download;
+window.addEventListener("beforeunload",()=>stream&&stream.getTracks().forEach(t=>t.stop()));
+update();
+show(0);
+})();
+</script></body></html>
