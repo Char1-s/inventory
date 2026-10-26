@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f4f6fa">
   <title>재고조사</title>
-
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
 
   <style>
@@ -16,8 +15,6 @@
       --text: #172033;
       --muted: #697386;
       --border: #dce2ec;
-      --danger: #dc2626;
-      --success: #059669;
     }
 
     * { box-sizing: border-box; }
@@ -28,8 +25,7 @@
       padding-bottom: calc(12px + env(safe-area-inset-bottom));
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "Noto Sans KR", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
       font-size: 14px;
     }
 
@@ -58,7 +54,6 @@
     }
 
     h1 { font-size: 21px; margin: 0; }
-
     .subheading { margin-top: 2px; color: var(--muted); font-size: 11px; }
 
     .card {
@@ -67,7 +62,7 @@
       border-radius: 12px;
       padding: 11px;
       margin-bottom: 8px;
-      box-shadow: 0 1px 5px rgba(25, 40, 70, .03);
+      box-shadow: 0 1px 5px rgba(25,40,70,.03);
     }
 
     .section-title { font-size: 16px; font-weight: 800; margin-bottom: 9px; }
@@ -81,9 +76,7 @@
 
     .progress-step { height: 4px; border-radius: 10px; background: #e1e6ef; }
     .progress-step.active { background: var(--primary); }
-
     .step-label { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
-
     label { display: block; font-weight: 700; margin-bottom: 5px; }
 
     input {
@@ -101,7 +94,7 @@
 
     input:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, .1);
+      box-shadow: 0 0 0 2px rgba(37,99,235,.1);
     }
 
     .input-row { display: flex; gap: 6px; }
@@ -114,7 +107,6 @@
     .full { width: 100%; }
     .button-row { display: flex; gap: 7px; margin-top: 9px; }
     .button-row > button { flex: 1; }
-
     .hint { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 
     .current-location {
@@ -140,7 +132,6 @@
     }
 
     .camera-container.visible { display: block; }
-
     #video { display: block; width: 100%; height: 100%; object-fit: cover; }
 
     .scan-frame {
@@ -151,7 +142,7 @@
       top: 33%;
       border: 2px solid #00e676;
       border-radius: 6px;
-      box-shadow: 0 0 0 999px rgba(0, 0, 0, .15);
+      box-shadow: 0 0 0 999px rgba(0,0,0,.15);
       pointer-events: none;
     }
 
@@ -190,73 +181,68 @@
 
     .empty { padding: 14px 8px; text-align: center; color: var(--muted); font-size: 12px; }
 
-    /* 압축형 조사 내역 */
+    /* 조사 내역: 두 줄로 표시 */
     .record {
+      padding: 6px 0;
       border-bottom: 1px solid #e8ecf3;
-      padding: 7px 0;
     }
 
-    .record:last-child { border-bottom: 0; padding-bottom: 1px; }
+    .record:last-child { border-bottom: 0; }
 
-    .record-top {
+    .record-line {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
+      min-width: 0;
+      min-height: 19px;
     }
 
-    .record-main { min-width: 0; flex: 1; }
+    .record-line-one { margin-bottom: 3px; }
+
+    .record-time {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
 
     .record-location {
-      font-weight: 800;
       font-size: 12px;
+      font-weight: 800;
       overflow-wrap: anywhere;
-      line-height: 1.35;
+      min-width: 0;
+      flex: 1;
     }
 
     .record-barcode {
       font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
       overflow-wrap: anywhere;
-    }
-
-    .record-meta {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 2px;
+      min-width: 0;
+      flex: 1;
+      line-height: 1.3;
     }
 
     .record-qty {
       display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-top: 5px;
       align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
     }
 
     .qty-tag {
       background: #f0f3f8;
       border-radius: 5px;
-      padding: 3px 6px;
+      padding: 3px 5px;
       font-size: 10px;
       white-space: nowrap;
     }
 
-    .record-total {
-      font-weight: 800;
-      color: var(--primary);
-      font-size: 11px;
-      margin-left: auto;
-      white-space: nowrap;
-    }
-
     .delete-one {
-      min-height: 29px;
-      padding: 4px 7px;
+      min-height: 25px;
+      padding: 3px 6px;
       background: #fff1f2;
       color: #be123c;
-      font-size: 11px;
+      font-size: 10px;
       flex-shrink: 0;
     }
 
@@ -270,7 +256,7 @@
       align-items: center;
       justify-content: center;
       padding: 18px;
-      background: rgba(15, 23, 42, .55);
+      background: rgba(15,23,42,.55);
     }
 
     .modal-backdrop.visible { display: flex; }
@@ -281,7 +267,7 @@
       background: white;
       border-radius: 14px;
       padding: 17px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, .2);
+      box-shadow: 0 12px 40px rgba(0,0,0,.2);
     }
 
     .modal h2 { font-size: 18px; margin: 0 0 7px; }
@@ -313,6 +299,9 @@
       .card { padding: 9px; }
       h1 { font-size: 19px; }
       .camera-container { max-height: 190px; }
+      .record-qty { gap: 3px; }
+      .qty-tag { padding: 3px 4px; font-size: 9px; }
+      .record-barcode { font-size: 10px; }
     }
   </style>
 </head>
@@ -345,7 +334,7 @@
         <input id="locationInput" placeholder="예: A-01-01" autocomplete="off">
         <button id="scanLocationBtn" class="btn-secondary">▦ 스캔</button>
       </div>
-      <div class="hint">기존 위치가 입력되어 있습니다. 같은 위치면 그대로 진행하고, 다른 위치면 수정하세요.</div>
+      <div class="hint">같은 위치면 그대로 진행하고, 다른 위치면 수정하세요.</div>
       <button id="locationNextBtn" class="btn-primary full" style="margin-top:9px">위치 확인 · 다음</button>
     </div>
 
@@ -357,7 +346,10 @@
         <button id="scanBarcodeBtn" class="btn-primary">▦ 스캔</button>
       </div>
       <div class="hint">바코드 스캔 후 인식 결과를 확인하세요.</div>
-      <button id="barcodeNextBtn" class="btn-primary full" style="margin-top:9px">바코드 확인 · 다음</button>
+      <div class="button-row">
+        <button id="barcodeBackBtn" class="btn-outline">이전</button>
+        <button id="barcodeNextBtn" class="btn-primary">바코드 확인 · 다음</button>
+      </div>
     </div>
 
     <div id="quantityStep" class="hidden">
@@ -504,7 +496,6 @@
     document.querySelectorAll(".progress-step").forEach((el, index) => {
       el.classList.toggle("active", index <= state.step);
     });
-
     $("stepLabel").textContent = (state.step + 1) + " / 5 단계";
     $("stepTitle").textContent = stepTitles[state.step];
   }
@@ -658,33 +649,28 @@
 
   function continueLocation() {
     const value = $("locationInput").value.trim();
-
     if (!value) {
       alert("조사 위치를 입력하거나 스캔해주세요.");
       $("locationInput").focus();
       return;
     }
-
     state.location = value;
     goToStep(1);
   }
 
   function continueBarcode() {
     const value = $("barcodeInput").value.trim();
-
     if (!value) {
       alert("상품 바코드를 입력하거나 스캔해주세요.");
       $("barcodeInput").focus();
       return;
     }
-
     state.barcode = value;
     goToStep(2);
   }
 
   function readInteger(id, label, minimum) {
     const raw = $(id).value.trim();
-
     if (raw === "") {
       alert(label + "을(를) 입력해주세요.");
       $(id).focus();
@@ -692,13 +678,11 @@
     }
 
     const value = Number(raw);
-
     if (!Number.isInteger(value) || value < minimum) {
       alert(label + "은(는) " + minimum + " 이상의 정수로 입력해주세요.");
       $(id).focus();
       return null;
     }
-
     return value;
   }
 
@@ -728,7 +712,12 @@
 
       state.records.unshift({
         id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
-        date: new Date().toLocaleString("ko-KR"),
+        time: new Date().toLocaleTimeString("ko-KR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }),
         location: state.location,
         barcode: state.barcode,
         pack: Number(state.pack),
@@ -739,7 +728,7 @@
 
       renderRecords();
 
-      // 수량은 초기화하지만 로케이션 값은 유지
+      // 품목 정보는 초기화하고 로케이션은 유지
       state.barcode = "";
       state.pack = "";
       state.boxes = "";
@@ -749,9 +738,9 @@
       $("packInput").value = "";
       $("boxInput").value = "";
       $("eachInput").value = "";
-
-      // 핵심 변경: 다음 품목은 로케이션 입력부터 시작
       $("locationInput").value = state.location;
+
+      // 다음 품목은 로케이션 입력 화면부터
       goToStep(0);
       showMessage("등록 완료! 같은 위치면 그대로 진행하고, 다른 위치면 로케이션을 수정하세요.");
     }
@@ -772,25 +761,17 @@
       const card = document.createElement("div");
       card.className = "record";
 
-      const top = document.createElement("div");
-      top.className = "record-top";
+      // 1행: 시간 / 로케이션 / 삭제
+      const line1 = document.createElement("div");
+      line1.className = "record-line record-line-one";
 
-      const main = document.createElement("div");
-      main.className = "record-main";
+      const time = document.createElement("span");
+      time.className = "record-time";
+      time.textContent = record.time;
 
-      const location = document.createElement("div");
+      const location = document.createElement("span");
       location.className = "record-location";
       location.textContent = record.location;
-
-      const barcode = document.createElement("div");
-      barcode.className = "record-barcode";
-      barcode.textContent = "바코드: " + record.barcode;
-
-      const meta = document.createElement("div");
-      meta.className = "record-meta";
-      meta.textContent = record.date;
-
-      main.append(location, barcode, meta);
 
       const del = document.createElement("button");
       del.className = "delete-one";
@@ -801,25 +782,32 @@
         renderRecords();
       });
 
-      top.append(main, del);
+      line1.append(time, location, del);
+
+      // 2행: 바코드 / 입수 / 박스 / 낱개
+      const line2 = document.createElement("div");
+      line2.className = "record-line";
+
+      const barcode = document.createElement("span");
+      barcode.className = "record-barcode";
+      barcode.textContent = record.barcode;
 
       const qty = document.createElement("div");
       qty.className = "record-qty";
 
-      ["입수 " + record.pack, "박스 " + record.boxes, "낱개 " + record.each]
-        .forEach(text => {
-          const tag = document.createElement("span");
-          tag.className = "qty-tag";
-          tag.textContent = text;
-          qty.appendChild(tag);
-        });
+      [
+        "입수 " + record.pack,
+        "박스 " + record.boxes,
+        "낱개 " + record.each
+      ].forEach(text => {
+        const tag = document.createElement("span");
+        tag.className = "qty-tag";
+        tag.textContent = text;
+        qty.appendChild(tag);
+      });
 
-      const total = document.createElement("span");
-      total.className = "record-total";
-      total.textContent = "총 " + record.total.toLocaleString("ko-KR") + "개";
-      qty.appendChild(total);
-
-      card.append(top, qty);
+      line2.append(barcode, qty);
+      card.append(line1, line2);
       list.appendChild(card);
     });
   }
@@ -830,8 +818,10 @@
       return;
     }
 
-    const headers = ["조사일시", "위치", "바코드", "입수", "박스수량", "낱개수량", "총낱개수량"];
-    const rows = state.records.map(r => [r.date, r.location, r.barcode, r.pack, r.boxes, r.each, r.total]);
+    const headers = ["조사시간", "위치", "바코드", "입수", "박스수량", "낱개수량", "총낱개수량"];
+    const rows = state.records.map(r => [
+      r.time, r.location, r.barcode, r.pack, r.boxes, r.each, r.total
+    ]);
 
     const escapeCSV = value => {
       let text = String(value ?? "");
@@ -860,6 +850,12 @@
 
   $("scanLocationBtn").addEventListener("click", () => startScan("location"));
   $("scanBarcodeBtn").addEventListener("click", () => startScan("barcode"));
+
+  // 바코드 화면에서 이전을 누르면 로케이션 입력으로 돌아감
+  $("barcodeBackBtn").addEventListener("click", () => {
+    $("locationInput").value = state.location;
+    goToStep(0);
+  });
 
   $("retryScanBtn").addEventListener("click", () => startScan(state.scanPurpose));
   $("stopScanBtn").addEventListener("click", () => {
@@ -896,9 +892,11 @@
   $("locationInput").addEventListener("keydown", e => {
     if (e.key === "Enter") continueLocation();
   });
+
   $("barcodeInput").addEventListener("keydown", e => {
     if (e.key === "Enter") continueBarcode();
   });
+
   ["packInput", "boxInput", "eachInput"].forEach(id => {
     $(id).addEventListener("keydown", e => {
       if (e.key === "Enter") continueQuantity();
