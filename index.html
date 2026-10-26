@@ -28,7 +28,17 @@ async function show(n){await stop();i=n;let s=steps[i];$("step").textContent=`${
 async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;await video.play();$("camArea").classList.remove("hidden");$("cameraBtn").classList.add("hidden");clearMsg()}catch(e){await stop();alert("카메라를 시작하지 못했습니다. HTTPS 주소와 카메라 권한을 확인하세요. "+(e.message||""))}}
 async function switchCam(){facing=facing==="environment"?"user":"environment";await stop();await start()}
 function choose(val){current[steps[i].key]=val;entry.value=val;$("choices").replaceChildren();msg("선택한 바코드: "+val)}
-function displayCandidates(arr){let uniq=[...new Map(arr.filter(x=>x.rawValue).map(x=>[x.rawValue,x])).values()];if(!uniq.length){msg("인식하지 못했습니다. 조명을 밝게 하고 바코드를 더 가까이 맞춰 다시 촬영하세요.");return}if(uniq.length===1){choose(uniq[0].rawValue);return}const c=$("choices");c.replaceChildren();let intro=document.createElement("p");intro.textContent=uniq.length+"개 바코드가 인식됐습니다. 사용할 코드를 선택하세요.";c.appendChild(intro);uniq.forEach((x,n)=>{let b=document.createElement("button");b.className="choice";b.type="button";b.textContent=x.rawValue;let small=document.createElement("small");small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;b.appendChild(small);b.onclick=()=>choose(x.rawValue);c.appendChild(b)})}
+function displayCandidates(arr){let uniq=[...new Map(arr.filter(x=>x.rawValue).map(x=>[x.rawValue,x])).values()];if(!uniq.length){msg("인식하지 못했습니다. 조명을 밝게 하고 바코드를 더 가까이 맞춰 다시 촬영하세요.");return}if(uniq.length===1){
+const detected=uniq[0].rawValue;
+if(confirm("인식된 바코드가 다음 코드가 맞습니까?\\n\\n"+detected)){
+choose(detected);
+}else{
+entry.value="";
+current[steps[i].key]="";
+msg("확인 취소됨. 바코드를 다시 맞추고 촬영 / 인식 버튼을 눌러 주세요.");
+}
+return
+}const c=$("choices");c.replaceChildren();let intro=document.createElement("p");intro.textContent=uniq.length+"개 바코드가 인식됐습니다. 사용할 코드를 선택하세요.";c.appendChild(intro);uniq.forEach((x,n)=>{let b=document.createElement("button");b.className="choice";b.type="button";b.textContent=x.rawValue;let small=document.createElement("small");small.textContent=`후보 ${n+1}${x.format?" · "+x.format:""}`;b.appendChild(small);b.onclick=()=>choose(x.rawValue);c.appendChild(b)})}
 async function capture(){if(!stream){await start();if(!stream)return}if(busy)return;busy=true;$("capture").textContent="인식 중…";try{if(detector){displayCandidates(await detector.detect(video))}else{if(typeof Html5Qrcode==="undefined")throw Error("인식 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.");let canvas=document.createElement("canvas");canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);let blob=await new Promise(res=>canvas.toBlob(res,"image/png"));let file=new File([blob],"capture.png",{type:"image/png"});let el=document.createElement("div");el.id="stillScan"+Date.now();el.style.display="none";document.body.appendChild(el);let qr=new Html5Qrcode(el.id);try{let result=await qr.scanFile(file,true);displayCandidates([{rawValue:result,format:"barcode"}])}catch(e){msg("인식하지 못했습니다. 조명을 밝게 하고 다시 촬영하세요.")}finally{try{await qr.clear()}catch(e){}el.remove()}}}catch(e){msg("바코드 인식에 실패했습니다. 초점과 조명을 확인하고 다시 촬영하세요.")}finally{busy=false;$("capture").textContent="촬영 / 인식"}}
 function next(){let s=steps[i],v=entry.value.trim();if(!v){alert(s.title+" 값을 입력하거나 스캔하세요.");entry.focus();return}current[s.key]=v;if(i<steps.length-1)show(i+1);else save()}
 function save(){records.push({...current});localStorage.setItem(KEY,JSON.stringify(records));let loc=current.location;current={location:loc,barcode:"",packQty:"",boxQty:"",each:""};update();$("status").textContent="저장 완료. 같은 로케이션이면 그대로 두고 상품코드만 스캔하세요.";show(0)}
