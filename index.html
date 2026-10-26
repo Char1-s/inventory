@@ -1,924 +1,456 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>스마트 재고조사 (고성능 바코드 스캐너)</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- html5-qrcode 스캐너 라이브러리 (최신 안정 버전) -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      touch-action: manipulation;
-    }
-    #reader video, #camera-stream {
-      object-fit: cover !important;
-      border-radius: 0.75rem;
-      width: 100%;
-      height: 100%;
-    }
-    .step-card {
-      transition: all 0.25s ease-in-out;
-    }
-    .step-card.hidden-step {
-      display: none;
-      opacity: 0;
-      transform: translateX(10px);
-    }
-    .step-card.active-step {
-      display: block;
-      opacity: 1;
-      transform: translateX(0);
-    }
-    /* 셔터 버튼 및 애니메이션 */
-    .shutter-btn:active {
-      transform: scale(0.9);
-    }
-    /* 스캔 레이저 애니메이션 */
-    @keyframes laser-scan {
-      0% { top: 10%; opacity: 0.8; }
-      50% { top: 90%; opacity: 1; }
-      100% { top: 10%; opacity: 0.8; }
-    }
-    .scan-laser {
-      position: absolute;
-      left: 5%;
-      width: 90%;
-      height: 2px;
-      background: #ef4444;
-      box-shadow: 0 0 8px #ef4444, 0 0 12px #ef4444;
-      animation: laser-scan 2s infinite ease-in-out;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>간편 재고조사 스캐너</title>
+    <!-- ZXing 바코드/QR코드 디코더 라이브러리 -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        h1 {
+            font-size: 1.3rem;
+            color: #f5f5f7;
+        }
+        /* 뷰파인더 스타일 */
+        .viewfinder-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            background-color: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 2px solid #333;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scan-guide {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-box {
+            width: 75%;
+            height: 50%;
+            border: 2px dashed rgba(255, 255, 255, 0.6);
+            border-radius: 10px;
+        }
+        .overlay-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #aaa;
+            font-size: 0.9rem;
+            text-align: center;
+            width: 90%;
+            pointer-events: none;
+        }
+        /* 에러 메시지 배너 */
+        .error-banner {
+            background: rgba(255, 59, 48, 0.2);
+            border: 1px solid #ff3b30;
+            color: #ff453a;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+            word-break: break-all;
+        }
+        /* 버튼 그리드 */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        button {
+            padding: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background-color: #007aff; color: white; }
+        .btn-primary:active { background-color: #0056b3; }
+        .btn-success { background-color: #34c759; color: white; }
+        .btn-success:active { background-color: #289e46; }
+        button:disabled { background-color: #2c2c2e; color: #555; cursor: not-allowed; }
+
+        /* 수동 입력 영역 */
+        .manual-input-box {
+            display: flex;
+            gap: 8px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #3a3a3c;
+            background-color: #1c1c1e;
+            color: white;
+            font-size: 0.95rem;
+        }
+        .btn-add {
+            background-color: #af52de;
+            color: white;
+            padding: 0 16px;
+        }
+
+        /* 재고 리스트 영역 */
+        .inventory-section {
+            background-color: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .inventory-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #8e8e93;
+            border-bottom: 1px solid #2c2c2e;
+            padding-bottom: 8px;
+        }
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .item-card {
+            background-color: #2c2c2e;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            word-break: break-all;
+            max-width: 60%;
+        }
+        .item-code {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #30d158;
+        }
+        .item-time {
+            font-size: 0.75rem;
+            color: #8e8e93;
+        }
+        .item-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .qty-btn {
+            background-color: #3a3a3c;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-size: 0.9rem;
+        }
+        .item-qty {
+            font-weight: bold;
+            font-size: 1rem;
+            min-width: 24px;
+            text-align: center;
+        }
+        .del-btn {
+            background-color: rgba(255, 59, 48, 0.2);
+            color: #ff453a;
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+        .empty-msg {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            padding: 20px 0;
+        }
+        canvas { display: none; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col pb-12">
+<body>
 
-  <!-- 상단 헤더 -->
-  <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
-    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-2">
-        <i class="fa-solid fa-boxes-stacked text-xl text-indigo-200"></i>
-        <h1 class="font-bold text-base">스마트 재고조사 Pro</h1>
-      </div>
-      <div class="flex items-center gap-2">
-        <button id="toggle-sound-btn" onclick="toggleSound()" class="text-xs bg-indigo-700 hover:bg-indigo-800 px-2.5 py-1.5 rounded-lg transition">
-          <i id="sound-icon" class="fa-solid fa-volume-high"></i>
-        </button>
-        <button id="reset-all-btn" class="text-xs bg-indigo-700 hover:bg-indigo-800 px-2.5 py-1.5 rounded-lg transition">
-          <i class="fa-solid fa-rotate"></i> 초기화
-        </button>
-      </div>
-    </div>
-  </header>
+<div class="container">
+    <header>
+        <h1>📦 간편 재고조사 스캐너</h1>
+    </header>
 
-  <main class="max-w-md mx-auto w-full px-4 pt-4 flex-1 space-y-4">
+    <!-- 에러 알림 -->
+    <div id="errorBanner" class="error-banner"></div>
 
-    <!-- 1. 단계별 진행 바 (Progress Bar) -->
-    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-      <div class="flex justify-between items-center text-xs font-bold text-slate-500 mb-2">
-        <span id="step-indicator-text" class="text-indigo-600">Step 1 / 5</span>
-        <span id="step-title-text">로케이션 입력</span>
-      </div>
-      <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-        <div id="progress-bar" class="bg-indigo-600 h-full w-1/5 transition-all duration-300"></div>
-      </div>
-    </section>
-
-    <!-- 2. 위저드 카드 -->
-    <section class="bg-white rounded-2xl shadow-md p-5 border border-slate-200 min-h-[320px] flex flex-col justify-between">
-      
-      <!-- STEP 1: 로케이션 입력 -->
-      <div id="step-1" class="step-card active-step space-y-4">
-        <div>
-          <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-md mb-2">STEP 1</span>
-          <h2 class="text-lg font-bold text-slate-800">로케이션을 촬영/스캔하세요</h2>
-          <p class="text-xs text-slate-500 mt-0.5">작업할 위치(선반, 렉 번호 등)를 지정합니다.</p>
+    <!-- 카메라 화면 -->
+    <div class="viewfinder-wrapper">
+        <video id="video" playsinline autoplay muted></video>
+        <div class="scan-guide">
+            <div class="scan-box"></div>
         </div>
-
-        <div class="space-y-3 pt-2">
-          <button type="button" onclick="openCameraModal('location')"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-sm">
-            <i class="fa-solid fa-expand text-lg"></i>
-            <span>고성능 스캐너 / 카메라 열기</span>
-          </button>
-          
-          <div class="relative flex py-1 items-center">
-            <div class="flex-grow border-t border-slate-200"></div>
-            <span class="flex-shrink mx-2 text-[11px] text-slate-400">또는 직접 입력</span>
-            <div class="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          <input type="text" id="step-input-location" placeholder="예: A-01-02" uppercase
-            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white uppercase">
+        <div id="overlayMsg" class="overlay-msg">
+            '카메라 시작' 버튼을 눌러주세요.
         </div>
-      </div>
-
-      <!-- STEP 2: 상품 바코드 입력 -->
-      <div id="step-2" class="step-card hidden-step space-y-4">
-        <div>
-          <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-md mb-2">STEP 2</span>
-          <h2 class="text-lg font-bold text-slate-800">상품 바코드를 촬영/스캔하세요</h2>
-          <p class="text-xs text-slate-500 mt-0.5">EAN-13, CODE-128, QR 등 다중 규격을 자동 인식합니다.</p>
-        </div>
-
-        <div class="space-y-3 pt-2">
-          <button type="button" onclick="openCameraModal('barcode')"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-sm">
-            <i class="fa-solid fa-barcode text-lg"></i>
-            <span>고성능 스캐너 / 카메라 열기</span>
-          </button>
-          
-          <div class="relative flex py-1 items-center">
-            <div class="flex-grow border-t border-slate-200"></div>
-            <span class="flex-shrink mx-2 text-[11px] text-slate-400">또는 수동 입력</span>
-            <div class="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          <input type="text" id="step-input-barcode" placeholder="바코드 번호 입력"
-            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
-        </div>
-      </div>
-
-      <!-- STEP 3: 입수 수량 -->
-      <div id="step-3" class="step-card hidden-step space-y-4">
-        <div>
-          <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-md mb-2">STEP 3</span>
-          <h2 class="text-lg font-bold text-slate-800">입수(박스당 수량) 입력</h2>
-          <p class="text-xs text-slate-500 mt-0.5">1박스에 들어가는 낱개(EA) 수량을 입력하세요.</p>
-        </div>
-
-        <div class="pt-2 space-y-3">
-          <div class="flex items-center gap-2">
-            <input type="number" id="step-input-pack-size" value="1" min="1" inputmode="numeric"
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-center text-2xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
-            <span class="text-sm font-bold text-slate-600 shrink-0">EA / Box</span>
-          </div>
-          <div class="grid grid-cols-4 gap-2 pt-1">
-            <button type="button" onclick="setQuickPack(1)" class="py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg text-slate-700">1</button>
-            <button type="button" onclick="setQuickPack(10)" class="py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg text-slate-700">10</button>
-            <button type="button" onclick="setQuickPack(12)" class="py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg text-slate-700">12</button>
-            <button type="button" onclick="setQuickPack(20)" class="py-2 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg text-slate-700">20</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 4: 박스 수량 -->
-      <div id="step-4" class="step-card hidden-step space-y-4">
-        <div>
-          <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-md mb-2">STEP 4</span>
-          <h2 class="text-lg font-bold text-slate-800">박스 수량을 입력하세요</h2>
-          <p class="text-xs text-slate-500 mt-0.5">미개봉 또는 완전한 박스의 개수입니다.</p>
-        </div>
-
-        <div class="pt-2">
-          <div class="flex items-center gap-2">
-            <input type="number" id="step-input-box-count" value="0" min="0" inputmode="numeric"
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-center text-2xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
-            <span class="text-sm font-bold text-slate-600 shrink-0">박스(BOX)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 5: 낱개 수량 및 등록 -->
-      <div id="step-5" class="step-card hidden-step space-y-4">
-        <div>
-          <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-extrabold px-2.5 py-1 rounded-md mb-2">STEP 5</span>
-          <h2 class="text-lg font-bold text-slate-800">낱개 수량 입력 및 확인</h2>
-          <p class="text-xs text-slate-500 mt-0.5">박스에 포함되지 않은 낱개(EA) 수량을 입력하세요.</p>
-        </div>
-
-        <div class="pt-1 space-y-3">
-          <div class="flex items-center gap-2">
-            <input type="number" id="step-input-ea-count" value="0" min="0" inputmode="numeric"
-              class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-center text-xl font-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
-            <span class="text-sm font-bold text-slate-600 shrink-0">낱개(EA)</span>
-          </div>
-
-          <!-- 최종 입력 내역 요약 카드 -->
-          <div class="bg-indigo-50/80 rounded-xl p-3 border border-indigo-100 text-xs space-y-1">
-            <div class="flex justify-between text-slate-600">
-              <span>로케이션 / 바코드:</span>
-              <span id="summary-loc-barcode" class="font-bold text-slate-800">-</span>
-            </div>
-            <div class="flex justify-between text-slate-600">
-              <span>박스 / 낱개 (입수):</span>
-              <span id="summary-counts" class="font-bold text-slate-800">-</span>
-            </div>
-            <div class="flex justify-between text-indigo-900 border-t border-indigo-200/60 pt-1.5 mt-1 font-bold">
-              <span>총 계산 수량:</span>
-              <span id="summary-total-ea" class="text-base font-black text-indigo-600">0 EA</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 하단 탐색 버튼 그룹 -->
-      <div class="flex items-center gap-2 pt-4 border-t border-slate-100 mt-4">
-        <button type="button" id="prev-btn" onclick="goToStep(currentStep - 1)" disabled
-          class="w-1/3 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-1">
-          <i class="fa-solid fa-chevron-left"></i> 이전
-        </button>
-        
-        <button type="button" id="next-btn" onclick="handleNextStep()"
-          class="w-2/3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition text-xs flex items-center justify-center gap-1 active:scale-98">
-          <span id="next-btn-text">다음</span>
-          <i id="next-btn-icon" class="fa-solid fa-chevron-right"></i>
-        </button>
-      </div>
-
-    </section>
-
-    <!-- 3. 조사 내역 목록 -->
-    <section class="bg-white rounded-2xl shadow-md p-4 border border-slate-200 space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <h3 class="font-bold text-slate-800 text-sm">조사 내역</h3>
-          <span id="record-count" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">0건</span>
-        </div>
-        <button id="download-csv-btn" onclick="downloadCSV()" disabled
-          class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95">
-          <i class="fa-solid fa-file-excel"></i> CSV 다운로드
-        </button>
-      </div>
-
-      <div class="overflow-x-auto rounded-xl border border-slate-200">
-        <table class="w-full text-left border-collapse min-w-[340px]">
-          <thead>
-            <tr class="bg-slate-50 text-slate-500 text-[11px] font-semibold border-b border-slate-200 uppercase">
-              <th class="py-2 px-2.5">위치 / 바코드</th>
-              <th class="py-2 px-2 text-center">박스/낱개</th>
-              <th class="py-2 px-2 text-right">총수량</th>
-              <th class="py-2 px-2 text-center w-12">작업</th>
-            </tr>
-          </thead>
-          <tbody id="inventory-list" class="divide-y divide-slate-100 text-xs text-slate-700"></tbody>
-        </table>
-        
-        <div id="empty-msg" class="py-8 text-center text-slate-400 space-y-1">
-          <i class="fa-solid fa-clipboard-list text-2xl text-slate-300 mb-1"></i>
-          <p class="text-xs">등록된 조사 내역이 없습니다.</p>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- 통합 고성능 카메라 / 스캐너 모달 -->
-  <div id="camera-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 hidden flex flex-col justify-between p-4">
-    <!-- 모달 상단 헤더 -->
-    <div class="flex items-center justify-between text-white pb-2">
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-camera text-indigo-400"></i>
-        <h3 id="camera-modal-title" class="font-bold text-sm">고성능 바코드 스캔</h3>
-      </div>
-      <div class="flex items-center gap-2">
-        <!-- 플래시/토치 토글 버튼 -->
-        <button id="torch-btn" onclick="toggleTorch()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-300 p-2 rounded-xl text-sm transition">
-          <i class="fa-solid fa-bolt"></i>
-        </button>
-        <button onclick="closeCameraModal()" class="text-slate-300 hover:text-white p-2">
-          <i class="fa-solid fa-xmark text-xl"></i>
-        </button>
-      </div>
     </div>
 
-    <!-- 카메라 스트림 / 미리보기 영역 -->
-    <div class="relative flex-1 bg-black rounded-2xl overflow-hidden flex items-center justify-center my-2 border border-slate-700 shadow-2xl">
-      <!-- Html5Qrcode 스캐너 구동 영역 -->
-      <div id="reader" class="w-full h-full"></div>
-      
-      <!-- 처리용 숨김 Canvas -->
-      <canvas id="photo-canvas" class="hidden"></canvas>
+    <!-- 제어 버튼 -->
+    <div class="controls-grid">
+        <button id="startBtn" class="btn-primary" onclick="initScanner()">📷 카메라 시작</button>
+        <button id="captureBtn" class="btn-success" onclick="captureAndScan()" disabled>📸 수동 스캔 촬영</button>
+    </div>
 
-      <!-- 스캔 프레임 가이드 및 레이저 라인 -->
-      <div id="scan-guide" class="absolute border-2 border-indigo-400/80 rounded-xl w-72 h-44 pointer-events-none flex items-center justify-center shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-        <div class="scan-laser"></div>
-        <div class="absolute -bottom-6 text-[11px] text-white/80 bg-slate-800/80 px-2 py-0.5 rounded-full font-mono">
-          초점을 바코드에 맞추세요
+    <!-- 직접 입력 박스 -->
+    <div class="manual-input-box">
+        <input type="text" id="manualInput" placeholder="바코드 번호 또는 품목명 직접 입력" onkeypress="if(event.key==='Enter') addItemManually()">
+        <button class="btn-add" onclick="addItemManually()">추가</button>
+    </div>
+
+    <!-- 재고 조사 리스트 -->
+    <div class="inventory-section">
+        <div class="inventory-header">
+            <span>조사된 품목 리스트</span>
+            <span id="totalCount">총 수량: 0개</span>
         </div>
-      </div>
+        <div id="itemList" class="item-list">
+            <div class="empty-msg">스캔된 내역이 없습니다.</div>
+        </div>
+        <button style="background-color: #3a3a3c; color: #ff453a; margin-top: 5px;" onclick="clearInventory()">🗑️ 전체 리스트 초기화</button>
     </div>
+</div>
 
-    <!-- 컨트롤 영역 (줌 제어 및 수동 캡처) -->
-    <div class="flex flex-col items-center gap-3 pt-1">
-      <!-- Zoom 슬라이더 컨트롤 (지원 장치용) -->
-      <div id="zoom-container" class="hidden w-full max-w-xs flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-xl text-white text-xs">
-        <i class="fa-solid fa-magnifying-glass-minus text-slate-400"></i>
-        <input type="range" id="zoom-range" min="1" max="5" step="0.1" value="1" oninput="setCameraZoom(this.value)" class="w-full accent-indigo-500 cursor-pointer">
-        <i class="fa-solid fa-magnifying-glass-plus text-indigo-400"></i>
-      </div>
+<canvas id="captureCanvas"></canvas>
 
-      <!-- 고해상도 수동 촬영 및 이미지 전처리 인식 셔터 버튼 -->
-      <div id="shutter-container" class="flex items-center justify-center gap-4 w-full">
-        <button type="button" onclick="captureAndEnhanceScan()" title="수동 캡처 및 선명도 강화 스캔" 
-          class="shutter-btn w-16 h-16 bg-white rounded-full border-4 border-indigo-500 flex items-center justify-center shadow-lg active:bg-slate-200 transition">
-          <div class="w-12 h-12 bg-indigo-600 rounded-full border-2 border-white flex items-center justify-center text-white text-xs">
-            <i class="fa-solid fa-bolt-lightning text-lg"></i>
-          </div>
-        </button>
-      </div>
+<script>
+    let codeReader = null;
+    let inventory = [];
+    const video = document.getElementById('video');
+    const overlayMsg = document.getElementById('overlayMsg');
+    const errorBanner = document.getElementById('errorBanner');
+    const startBtn = document.getElementById('startBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const itemList = document.getElementById('itemList');
+    const totalCount = document.getElementById('totalCount');
 
-      <p id="camera-hint" class="text-[11px] text-slate-300 text-center">
-        실시간 자동 스캔 중입니다. 잘 안될 경우 <span class="text-indigo-400 font-bold">중앙 셔터 버튼</span>을 눌러 강제 스캔하세요.
-      </p>
-    </div>
-  </div>
-
-  <!-- 이미지 스냅샷 모달 -->
-  <div id="snapshot-modal" class="fixed inset-0 bg-slate-900/90 z-50 hidden flex flex-col items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="font-bold text-sm text-slate-800">스냅샷 미리보기</h3>
-        <button onclick="closeSnapshotModal()" class="text-slate-400 hover:text-slate-600">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-      <img id="snapshot-img" class="w-full h-48 object-contain rounded-xl bg-slate-100 border border-slate-200" alt="Snapshot">
-      <button onclick="closeSnapshotModal()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-xl text-xs">닫기</button>
-    </div>
-  </div>
-
-  <!-- 커스텀 알림 토스트 -->
-  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-2">
-    <i id="toast-icon" class="fa-solid fa-circle-info text-indigo-400"></i>
-    <span id="toast-message">알림</span>
-  </div>
-
-  <script>
-    // 앱 상태 관리
-    let currentStep = 1;
-    let inventoryData = [];
-    let html5QrCode = null;
-    let currentScanTarget = null; // 'location' or 'barcode'
-    let isSoundEnabled = true;
-    let torchEnabled = false;
-    let currentTrack = null;
-
-    // DOM 요소
-    const stepInputLocation = document.getElementById('step-input-location');
-    const stepInputBarcode = document.getElementById('step-input-barcode');
-    const stepInputPackSize = document.getElementById('step-input-pack-size');
-    const stepInputBoxCount = document.getElementById('step-input-box-count');
-    const stepInputEaCount = document.getElementById('step-input-ea-count');
-    const canvasEl = document.getElementById('photo-canvas');
-
-    // 비프음 재생
-    function playBeepSound() {
-      if (!isSoundEnabled) return;
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(2000, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.12);
-      } catch (e) {
-        console.log(e);
-      }
-    }
-
-    function toggleSound() {
-      isSoundEnabled = !isSoundEnabled;
-      const soundIcon = document.getElementById('sound-icon');
-      if (isSoundEnabled) {
-        soundIcon.className = 'fa-solid fa-volume-high';
-        showToast("사운드가 활성화되었습니다.");
-      } else {
-        soundIcon.className = 'fa-solid fa-volume-xmark';
-        showToast("사운드가 음소거되었습니다.");
-      }
-    }
-
-    // 진동 알림
-    function triggerVibration() {
-      if ("vibrate" in navigator) {
-        navigator.vibrate(120);
-      }
-    }
-
-    // 토스트 메시지
-    function showToast(message, type = 'info') {
-      const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toast-message');
-      const toastIcon = document.getElementById('toast-icon');
-
-      toastMsg.textContent = message;
-      if (type === 'success') toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
-      else if (type === 'error') toastIcon.className = 'fa-solid fa-triangle-exclamation text-rose-400';
-      else toastIcon.className = 'fa-solid fa-circle-info text-indigo-400';
-
-      toast.classList.remove('opacity-0');
-      toast.classList.add('opacity-100');
-      setTimeout(() => {
-        toast.classList.remove('opacity-100');
-        toast.classList.add('opacity-0');
-      }, 2000);
-    }
-
-    // 위저드 스텝 이동
-    function goToStep(step) {
-      if (step < 1 || step > 5) return;
-
-      document.querySelectorAll('.step-card').forEach((card, idx) => {
-        if (idx + 1 === step) {
-          card.classList.remove('hidden-step');
-          card.classList.add('active-step');
-        } else {
-          card.classList.remove('active-step');
-          card.classList.add('hidden-step');
+    // 페이지 로드 시 로컬스토리지에서 기존 데이터 불러오기
+    window.onload = () => {
+        const saved = localStorage.getItem('inventory_data');
+        if (saved) {
+            try { inventory = JSON.parse(saved); } catch(e) { inventory = []; }
         }
-      });
-
-      currentStep = step;
-      document.getElementById('progress-bar').style.width = `${(step / 5) * 100}%`;
-      document.getElementById('step-indicator-text').textContent = `Step ${step} / 5`;
-      
-      const titles = [
-        '로케이션 입력',
-        '상품 바코드 입력',
-        '입수(박스당 수량)',
-        '박스 수량 입력',
-        '낱개 수량 & 최종 등록'
-      ];
-      document.getElementById('step-title-text').textContent = titles[step - 1];
-
-      const prevBtn = document.getElementById('prev-btn');
-      const nextBtnText = document.getElementById('next-btn-text');
-      const nextBtnIcon = document.getElementById('next-btn-icon');
-
-      prevBtn.disabled = (step === 1);
-
-      if (step === 5) {
-        nextBtnText.textContent = "재고 등록 완료";
-        nextBtnIcon.className = "fa-solid fa-check";
-        updateSummary();
-      } else {
-        nextBtnText.textContent = "다음";
-        nextBtnIcon.className = "fa-solid fa-chevron-right";
-      }
-
-      setTimeout(() => {
-        if (step === 1) stepInputLocation.focus();
-        else if (step === 2) stepInputBarcode.focus();
-        else if (step === 3) stepInputPackSize.select();
-        else if (step === 4) stepInputBoxCount.select();
-        else if (step === 5) stepInputEaCount.select();
-      }, 100);
-    }
-
-    // 다음 버튼 클릭 처리
-    function handleNextStep() {
-      if (currentStep === 1) {
-        const val = stepInputLocation.value.trim();
-        if (!val) {
-          showToast("로케이션을 입력하거나 스캔해주세요.", "error");
-          stepInputLocation.focus();
-          return;
-        }
-        goToStep(2);
-      } else if (currentStep === 2) {
-        const val = stepInputBarcode.value.trim();
-        if (!val) {
-          showToast("상품 바코드를 입력하거나 스캔해주세요.", "error");
-          stepInputBarcode.focus();
-          return;
-        }
-        goToStep(3);
-      } else if (currentStep === 3) {
-        const packSize = parseInt(stepInputPackSize.value) || 0;
-        if (packSize < 1) {
-          showToast("입수 수량은 1 이상이어야 합니다.", "error");
-          return;
-        }
-        goToStep(4);
-      } else if (currentStep === 4) {
-        goToStep(5);
-      } else if (currentStep === 5) {
-        submitInventory();
-      }
-    }
-
-    // 요약 정보 갱신
-    function updateSummary() {
-      const loc = stepInputLocation.value.trim().toUpperCase() || '-';
-      const barcode = stepInputBarcode.value.trim() || '-';
-      const packSize = parseInt(stepInputPackSize.value) || 1;
-      const boxCount = parseInt(stepInputBoxCount.value) || 0;
-      const eaCount = parseInt(stepInputEaCount.value) || 0;
-      const totalEa = (boxCount * packSize) + eaCount;
-
-      document.getElementById('summary-loc-barcode').textContent = `${loc} / ${barcode}`;
-      document.getElementById('summary-counts').textContent = `${boxCount}박스 / ${eaCount}EA (입수:${packSize})`;
-      document.getElementById('summary-total-ea').textContent = `${totalEa.toLocaleString()} EA`;
-    }
-
-    function setQuickPack(val) {
-      stepInputPackSize.value = val;
-      updateSummary();
-    }
-
-    [stepInputPackSize, stepInputBoxCount, stepInputEaCount].forEach(elem => {
-      elem.addEventListener('input', updateSummary);
-    });
-
-    [stepInputLocation, stepInputBarcode, stepInputPackSize, stepInputBoxCount, stepInputEaCount].forEach(elem => {
-      elem.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleNextStep();
-        }
-      });
-    });
-
-    // --- 고성능 바코드 스캐너 모달 ---
-    async function openCameraModal(target) {
-      currentScanTarget = target;
-      document.getElementById('camera-modal-title').textContent = 
-        target === 'location' ? '로케이션 스캔/촬영' : '상품 바코드 스캔/촬영';
-      
-      document.getElementById('camera-modal').classList.remove('hidden');
-
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-      }
-
-      // 고해상도 및 후면 카메라 트랙 제어 옵션
-      const config = {
-        fps: 20,
-        qrbox: { width: 280, height: 160 },
-        aspectRatio: 1.777778, // 16:9
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ]
-      };
-
-      const cameraConfig = {
-        facingMode: "environment",
-        width: { min: 1280, ideal: 1920 },
-        height: { min: 720, ideal: 1080 }
-      };
-
-      try {
-        await html5QrCode.start(
-          cameraConfig,
-          config,
-          onScanSuccess,
-          onScanError
-        );
-
-        // 플래시/토치 및 Zoom 컨트롤 활성화 체크
-        checkCameraCapabilities();
-
-      } catch (err) {
-        console.error("고해상도 카메라 접근 오류:", err);
-        // 기본 모드로 폴백 시도
-        try {
-          await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanError);
-          checkCameraCapabilities();
-        } catch (fallbackErr) {
-          showToast("카메라 접근 권한을 확인해 주세요.", "error");
-          closeCameraModal();
-        }
-      }
-    }
-
-    function checkCameraCapabilities() {
-      try {
-        const videoElement = document.querySelector("#reader video");
-        if (videoElement && videoElement.srcObject) {
-          const track = videoElement.srcObject.getVideoTracks()[0];
-          currentTrack = track;
-          const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
-          // 플래시/토치 버튼 제어
-          const torchBtn = document.getElementById('torch-btn');
-          if (capabilities.torch) {
-            torchBtn.classList.remove('hidden');
-          } else {
-            torchBtn.classList.add('hidden');
-          }
-
-          // 줌 제어
-          const zoomContainer = document.getElementById('zoom-container');
-          const zoomRange = document.getElementById('zoom-range');
-          if (capabilities.zoom) {
-            zoomContainer.classList.remove('hidden');
-            zoomRange.min = capabilities.zoom.min;
-            zoomRange.max = capabilities.zoom.max;
-            zoomRange.step = capabilities.zoom.step || 0.1;
-            zoomRange.value = track.getSettings().zoom || 1;
-          } else {
-            zoomContainer.classList.add('hidden');
-          }
-        }
-      } catch (e) {
-        console.log("기기 제어 기능 미지원:", e);
-      }
-    }
-
-    async function toggleTorch() {
-      if (!currentTrack) return;
-      try {
-        torchEnabled = !torchEnabled;
-        await currentTrack.applyConstraints({
-          advanced: [{ torch: torchEnabled }]
-        });
-        showToast(torchEnabled ? "플래시 켜짐" : "플래시 꺼짐");
-      } catch (e) {
-        showToast("플래시를 제어할 수 없습니다.", "error");
-      }
-    }
-
-    async function setCameraZoom(val) {
-      if (!currentTrack) return;
-      try {
-        await currentTrack.applyConstraints({
-          advanced: [{ zoom: parseFloat(val) }]
-        });
-      } catch (e) {
-        console.log("Zoom 적용 실패", e);
-      }
-    }
-
-    function onScanError(errorMessage) {
-      // 프레임별 바코드 미감지는 정상 동작이므로 무시
-    }
-
-    // 자동 스캔 성공
-    function onScanSuccess(decodedText, decodedResult) {
-      playBeepSound();
-      triggerVibration();
-      applyScannedResult(decodedText);
-      closeCameraModal();
-    }
-
-    // 수동 캡처 + Canvas 명암/2진화 영상 처리 후 강제 스캔
-    async function captureAndEnhanceScan() {
-      const videoEl = document.querySelector('#reader video');
-      if (!videoEl || !videoEl.videoWidth) return;
-
-      playBeepSound();
-      triggerVibration();
-
-      canvasEl.width = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
-      const ctx = canvasEl.getContext('2d');
-      ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-
-      // 이미지 명암비 향상 및 Grayscale 2진화 처리
-      const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-      const data = imageData.data;
-      
-      for (let i = 0; i < data.length; i += 4) {
-        // Grayscale 흑백 변환
-        const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-        // Contrast & Thresholding (선명화)
-        const threshold = avg > 120 ? 255 : 0;
-        data[i] = threshold;     // R
-        data[i + 1] = threshold; // G
-        data[i + 2] = threshold; // B
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      // 전처리된 이미지 캔버스로부터 바코드 재분석
-      canvasEl.toBlob(async (blob) => {
-        if (!blob) return;
-        const file = new File([blob], "scan_enhanced.png", { type: "image/png" });
-        try {
-          const result = await html5QrCode.scanFileV2(file, true);
-          if (result && result.decodedText) {
-            applyScannedResult(result.decodedText);
-            closeCameraModal();
-            return;
-          }
-        } catch (e) {
-          // 전처리 이미지로 감지 실패 시 원본 프레임 시도
-          fallbackSnapshotScan(videoEl);
-        }
-      }, 'image/png');
-    }
-
-    // 원본 스냅샷 스캔 폴백
-    function fallbackSnapshotScan(videoEl) {
-      canvasEl.toBlob(async (blob) => {
-        if (!blob) return;
-        const file = new File([blob], "scan_raw.png", { type: "image/png" });
-        try {
-          const result = await html5QrCode.scanFileV2(file, true);
-          if (result && result.decodedText) {
-            applyScannedResult(result.decodedText);
-            closeCameraModal();
-            return;
-          }
-        } catch (err) {
-          showToast("바코드를 인식하지 못했습니다. 더 가까이 대거나 초점을 맞춰주세요.", "error");
-        }
-      });
-    }
-
-    function applyScannedResult(text) {
-      const cleanText = text.trim();
-      if (currentScanTarget === 'location') {
-        stepInputLocation.value = cleanText.toUpperCase();
-        showToast(`로케이션: ${cleanText}`, "success");
-        goToStep(2);
-      } else if (currentScanTarget === 'barcode') {
-        stepInputBarcode.value = cleanText;
-        showToast(`바코드: ${cleanText}`, "success");
-        goToStep(3);
-      }
-    }
-
-    async function closeCameraModal() {
-      document.getElementById('camera-modal').classList.add('hidden');
-      torchEnabled = false;
-      currentTrack = null;
-
-      if (html5QrCode && html5QrCode.isScanning) {
-        try {
-          await html5QrCode.stop();
-        } catch (err) {
-          console.error("스캐너 중지 오류:", err);
-        }
-      }
-    }
-
-    // --- 데이터 저장 및 관리 ---
-    function submitInventory() {
-      const location = stepInputLocation.value.trim().toUpperCase();
-      const barcode = stepInputBarcode.value.trim();
-      const packSize = parseInt(stepInputPackSize.value) || 1;
-      const boxCount = parseInt(stepInputBoxCount.value) || 0;
-      const eaCount = parseInt(stepInputEaCount.value) || 0;
-      const totalEa = (boxCount * packSize) + eaCount;
-
-      if (totalEa <= 0) {
-        showToast("수량이 0 이상이어야 합니다.", "error");
-        return;
-      }
-
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const datetime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-      const newItem = {
-        id: Date.now(),
-        datetime,
-        location,
-        barcode,
-        packSize,
-        boxCount,
-        eaCount,
-        totalEa
-      };
-
-      inventoryData.unshift(newItem);
-      saveData();
-
-      showToast("재고가 등록되었습니다!", "success");
-
-      // 초기화 및 연속 입력을 위해 Step 2로 이동
-      stepInputBarcode.value = '';
-      stepInputBoxCount.value = '0';
-      stepInputEaCount.value = '0';
-      goToStep(2);
-    }
-
-    function deleteItem(id) {
-      inventoryData = inventoryData.filter(item => item.id !== id);
-      saveData();
-      showToast("항목이 삭제되었습니다.");
-    }
-
-    function copyToClipboard(text) {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      showToast(`복사됨: ${text}`, "success");
-    }
-
-    function saveData() {
-      localStorage.setItem('netlify_inventory_data', JSON.stringify(inventoryData));
-      renderList();
-    }
-
-    function loadData() {
-      const saved = localStorage.getItem('netlify_inventory_data');
-      if (saved) {
-        try { inventoryData = JSON.parse(saved); } catch (e) { inventoryData = []; }
-      }
-      renderList();
-    }
-
-    function renderList() {
-      const listEl = document.getElementById('inventory-list');
-      const emptyMsg = document.getElementById('empty-msg');
-      const downloadBtn = document.getElementById('download-csv-btn');
-      
-      listEl.innerHTML = '';
-      document.getElementById('record-count').textContent = `${inventoryData.length}건`;
-
-      if (inventoryData.length === 0) {
-        emptyMsg.classList.remove('hidden');
-        downloadBtn.disabled = true;
-        return;
-      }
-
-      emptyMsg.classList.add('hidden');
-      downloadBtn.disabled = false;
-
-      inventoryData.forEach(item => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 border-b border-slate-100 transition";
-        tr.innerHTML = `
-          <td class="py-2.5 px-2.5">
-            <div class="font-bold text-slate-800 text-xs">${item.location}</div>
-            <div class="font-mono text-[11px] text-indigo-600 font-semibold cursor-pointer flex items-center gap-1" onclick="copyToClipboard('${item.barcode}')">
-              <span>${item.barcode}</span>
-              <i class="fa-regular fa-copy text-[10px] text-slate-400"></i>
-            </div>
-          </td>
-          <td class="py-2.5 px-2 text-center text-xs">
-            <span class="font-semibold">${item.boxCount}</span>BOX / <span class="font-semibold">${item.eaCount}</span>EA
-          </td>
-          <td class="py-2.5 px-2 text-right font-black text-indigo-600 text-sm">
-            ${item.totalEa.toLocaleString()}
-          </td>
-          <td class="py-2.5 px-2 text-center">
-            <button onclick="deleteItem(${item.id})" class="text-slate-400 hover:text-rose-500 p-1" title="삭제">
-              <i class="fa-regular fa-trash-can"></i>
-            </button>
-          </td>
-        `;
-        listEl.appendChild(tr);
-      });
-    }
-
-    // CSV 다운로드 (UTF-8 BOM 포함)
-    function downloadCSV() {
-      if (inventoryData.length === 0) return;
-
-      const headers = ["순번", "일시", "로케이션", "상품바코드", "입수", "박스수량", "낱개수량", "총수량(EA)"];
-      const rows = inventoryData.map((item, index) => [
-        inventoryData.length - index,
-        `"${item.datetime}"`,
-        `"${item.location}"`,
-        `"${item.barcode}"`,
-        item.packSize,
-        item.boxCount,
-        item.eaCount,
-        item.totalEa
-      ]);
-
-      const csvString = headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
-      const BOM = "\uFEFF";
-      const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' });
-
-      const pad = (n) => String(n).padStart(2, '0');
-      const now = new Date();
-      const dateStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `inventory_${dateStr}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      showToast("CSV 파일 다운로드 완료!", "success");
-    }
-
-    // 데이터 전체 초기화
-    document.getElementById('reset-all-btn').addEventListener('click', () => {
-      if (inventoryData.length === 0) return;
-      if (confirm("등록된 모든 재고 조사 데이터를 삭제하시겠습니까?")) {
-        inventoryData = [];
-        saveData();
-        goToStep(1);
-        showToast("모든 데이터가 초기화되었습니다.");
-      }
-    });
-
-    window.onload = function() {
-      loadData();
-      goToStep(1);
+        renderInventory();
     };
-  </script>
+
+    function saveAndRender() {
+        localStorage.setItem('inventory_data', JSON.stringify(inventory));
+        renderInventory();
+    }
+
+    function showError(msg) {
+        errorBanner.style.display = 'block';
+        errorBanner.innerText = msg;
+    }
+
+    // 카메라 시작 및 실시간 바코드 디코딩
+    async function initScanner() {
+        errorBanner.style.display = 'none';
+        try {
+            if (!codeReader) {
+                codeReader = new ZXing.BrowserMultiFormatReader();
+            }
+
+            const constraints = {
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            
+            video.onloadedmetadata = () => {
+                video.play();
+                overlayMsg.style.display = 'none';
+                startBtn.innerText = "카메라 재시작";
+                captureBtn.disabled = false;
+                
+                // 실시간 스캔 시작
+                startContinuousDecode();
+            };
+        } catch (err) {
+            console.error(err);
+            showError("카메라 에러: " + (err.message || err.name));
+        }
+    }
+
+    // 실시간 자동 스캔
+    function startContinuousDecode() {
+        codeReader.decodeFromVideoElement(video, (result, err) => {
+            if (result) {
+                addOrUpdateItem(result.getText());
+            }
+        });
+    }
+
+    // 수동 캡처 및 스캔
+    function captureAndScan() {
+        if (!video.videoWidth) return;
+        const canvas = document.getElementById('captureCanvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const img = new Image();
+        img.src = canvas.toDataURL('image/png');
+        img.onload = async () => {
+            try {
+                const result = await codeReader.decodeFromImageElement(img);
+                if (result) {
+                    addOrUpdateItem(result.getText());
+                }
+            } catch (e) {
+                alert("촬영된 이미지에서 바코드를 찾지 못했습니다.");
+            }
+        };
+    }
+
+    // 수동 직접 추가
+    function addItemManually() {
+        const input = document.getElementById('manualInput');
+        const val = input.value.trim();
+        if (!val) return;
+        addOrUpdateItem(val);
+        input.value = '';
+    }
+
+    // 아이템 추가 또는 수량 증가 로직
+    function addOrUpdateItem(code) {
+        const existing = inventory.find(item => item.code === code);
+        if (existing) {
+            existing.qty += 1;
+            existing.time = new Date().toLocaleTimeString();
+        } else {
+            inventory.unshift({
+                code: code,
+                qty: 1,
+                time: new Date().toLocaleTimeString()
+            });
+        }
+        
+        // 진동 피드백 (지원 기기)
+        if (navigator.vibrate) navigator.vibrate(80);
+        saveAndRender();
+    }
+
+    // 수량 변경
+    fnChangeQty = function(index, delta) {
+        inventory[index].qty += delta;
+        if (inventory[index].qty <= 0) {
+            inventory.splice(index, 1);
+        }
+        saveAndRender();
+    }
+
+    // 아이템 삭제
+    function removeItem(index) {
+        inventory.splice(index, 1);
+        saveAndRender();
+    }
+
+    // 전체 초기화
+    function clearInventory() {
+        if (confirm("정말 모든 재고 리스트를 초기화하시겠습니까?")) {
+            inventory = [];
+            saveAndRender();
+        }
+    }
+
+    // 리스트 화면 렌더링
+    function renderInventory() {
+        if (inventory.length === 0) {
+            itemList.innerHTML = `<div class="empty-msg">스캔된 내역이 없습니다.</div>`;
+            totalCount.innerText = "총 수량: 0개";
+            return;
+        }
+
+        let html = '';
+        let totalQ = 0;
+        inventory.forEach((item, idx) => {
+            totalQ += item.qty;
+            html += `
+                <div class="item-card">
+                    <div class="item-info">
+                        <span class="item-code">${escapeHtml(item.code)}</span>
+                        <span class="item-time">${item.time}</span>
+                    </div>
+                    <div class="item-controls">
+                        <button class="qty-btn" onclick="fnChangeQty(${idx}, -1)">-</button>
+                        <span class="item-qty">${item.qty}</span>
+                        <button class="qty-btn" onclick="fnChangeQty(${idx}, 1)">+</button>
+                        <button class="del-btn" onclick="removeItem(${idx})">삭제</button>
+                    </div>
+                </div>
+            `;
+        });
+        itemList.innerHTML = html;
+        totalCount.innerText = `총 수량: ${totalQ}개`;
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>'"]/g, 
+            tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+    }
+</script>
 </body>
 </html>
